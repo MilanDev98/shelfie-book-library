@@ -1,0 +1,12 @@
+{
+  "name": "@shelfie/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "uv --cache-dir ../../.cache/uv run python manage.py runserver 0.0.0.0:8000",
+    "build": "uv --cache-dir ../../.cache/uv run python manage.py check",
+    "lint": "uv --cache-dir ../../.cache/uv run ruff check .",
+    "test": "uv --cache-dir ../../.cache/uv run python manage.py test",
+    "typecheck": "uv --cache-dir ../../.cache/uv run mypy config"
+  }
+}

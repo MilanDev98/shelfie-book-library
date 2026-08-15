@@ -5,9 +5,11 @@
 
 # JavaScript
 node_modules/
+.pnpm-store/
 .expo/
 dist/
 .turbo/
+coverage/
 
 # Python
 .venv/
@@ -21,9 +23,9 @@ __pycache__/
 # Models and generated media
 .cache/
 apps/api/media/
+apps/api/staticfiles/
 
 # Editors and operating systems
 .DS_Store
 .idea/
 .vscode/
-
