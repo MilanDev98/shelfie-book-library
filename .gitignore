@@ -1,0 +1,29 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# JavaScript
+node_modules/
+.expo/
+dist/
+.turbo/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Models and generated media
+.cache/
+apps/api/media/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
