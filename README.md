@@ -1,80 +1,68 @@
 # Shelfie
 
-Shelfie turns a bookshelf photo into a structured personal library. The project uses one
-Turborepo containing an Expo mobile app and a Django REST API.
+Shelfie is an Expo + Django take-home app that turns a bookshelf photo into a
+reviewable, persistent personal library. The complete path is:
 
-This repository contains the project foundation, deterministic catalog matching, a local CPU
-OWLv2 book-spine detector, hosted title/author extraction through a Django-only OpenRouter
-integration, and the Expo client connection for scan, review, and saved-library flows.
+1. Take or choose a photo in the Expo app.
+2. Upload it to Django REST Framework.
+3. Detect book-spine regions locally with CPU-only OWLv2.
+4. Send only the detected spine crops to a hosted vision-language model through
+   OpenRouter to read title and author text.
+5. Match each read against a deliberately messy 170-book catalog.
+6. Add confident matches directly; confirm, correct, or discard uncertain reads.
+7. Persist confirmed catalog books to SQLite and show them in the mobile library.
 
-## Prepare OpenRouter configuration
+The project is intentionally single-user and local-development focused. Authentication and
+deployment were outside the assignment scope.
 
-OpenRouter reads a possible title and author from each individual book-spine crop. The mobile app
-uploads photos only to Django; it never receives or sends the OpenRouter credential.
-
-Create the ignored local environment file during first-time setup, then edit only your local
-`.env` file and set these exact variables:
-
-```dotenv
-OPENROUTER_API_KEY=your-real-openrouter-key
-OPENROUTER_VISION_MODEL=google/gemini-2.5-flash
-```
-
-- `OPENROUTER_API_KEY` is the private server-side credential. Never put it in `.env.example`,
-  source code, screenshots, logs, commits, Expo variables, or any `EXPO_PUBLIC_*` variable.
-- `OPENROUTER_VISION_MODEL` is the selected OpenRouter model ID. Shelfie currently selects
-  `google/gemini-2.5-flash`. Before running the later provider integration, confirm on its current
-  OpenRouter model page that it still supports both image input and structured output/JSON Schema.
-  Model capabilities and pricing can change, so this repository does not assume the selected model
-  is free or permanently compatible.
-- Keep `OPENROUTER_API_KEY` empty in `.env.example`; that file documents variable names and is safe
-  to commit. The selected model ID is safe to include there.
-
-After adding or changing either value, stop Django with `Ctrl+C` and start it again:
-
-```bash
-pnpm --filter @shelfie/api dev
-```
-
-Django reads environment variables when its process starts. A running server will not reliably
-pick up `.env` changes until it is restarted. Do not paste a real API key into chat; add it locally
-yourself.
-
-## Workspace
+## Architecture
 
 ```text
-apps/
-├── api/       Django 6.1 + Django REST Framework + SQLite
-└── mobile/    Expo SDK 57 + React Native + TypeScript + Expo Router
+Expo camera / picker
+        |
+        | multipart shelf image
+        v
+Django POST /api/v1/analyze/read
+        |
+        +--> local OWLv2 on CPU --> up to 12 spine crops
+        |                              |
+        |                              | HTTPS, crops only
+        |                              v
+        |                         OpenRouter VLM
+        |                              |
+        +<-- title + author JSON <-----+
+        |
+        +--> deterministic fuzzy matcher --> matched / not_sure / not_found
+                                             |
+                                             v
+                                   Expo review and correction
+                                             |
+                                             v
+                                  SQLite saved-book library
 ```
 
-JavaScript packages are managed with pnpm. Python and the Django virtual environment are managed
-with uv. Turbo runs commands across both applications.
+- `apps/mobile`: Expo SDK 57, React Native, TypeScript, and Expo Router.
+- `apps/api`: Django 6.1, Django REST Framework, SQLite, OWLv2, Pillow, and
+  deterministic catalog matching.
+- `catalog.csv`: version-controlled source catalog imported into SQLite.
+- `test_photos`: the real shelf sample and zero-book control used during development.
 
-## Requirements
+The original image stays between the phone and Django. The hosted provider receives only the
+numbered spine crops. Images, detections, and provider output are not persisted; only catalog IDs
+explicitly confirmed by the user are saved.
 
-- macOS for the current iOS development workflow
-- Git
-- nvm
-- Node.js 22 (see `.nvmrc`)
-- pnpm 10.34.5 through Corepack
-- Python 3.12 (downloaded and managed by uv)
-- uv
-- Xcode and iOS Simulator for local iOS development
-- Expo Go on the Simulator or physical iPhone
+## Clean-clone setup
 
-Confirm that the main tools are available:
+### Requirements
 
-```bash
-git --version
-nvm --version
-uv --version
-xcode-select -p
-```
+- macOS with Xcode and an iOS Simulator for the documented native workflow
+- Git and nvm
+- Node.js 22 (`.nvmrc`)
+- Corepack / pnpm 10.34.5
+- [uv](https://docs.astral.sh/uv/)
+- An OpenRouter API key with access to `google/gemini-2.5-flash`
 
-## Clone and select the development branch
-
-For a new clone:
+Clone the repository and use the submission branch:
 
 ```bash
 git clone git@github.com:MilanDev98/shelfie-book-library.git
@@ -82,338 +70,189 @@ cd shelfie-book-library
 git switch develop
 ```
 
-If the repository is already on the computer, do not clone it again. Use the existing project
-folder and confirm the branch with `git branch --show-current`. Project work happens on
-`develop`; `main` remains the stable branch.
-
-## First-time setup
-
-Run each command separately in Terminal.
-
-### 1. Go to the project folder
-
-```bash
-cd shelfie-book-library
-```
-
-Terminal must be inside the cloned Shelfie repository before running project commands. If the
-repository was cloned into a different folder name or location, use that path instead.
-
-### 2. Use Node.js 22
+Install dependencies:
 
 ```bash
 nvm install
 nvm use
-```
-
-`nvm install` installs the version from `.nvmrc` when needed. `nvm use` activates that version in
-the current Terminal.
-
-### 3. Enable pnpm
-
-```bash
 corepack enable
-```
-
-This makes the pnpm package manager available through Node.js.
-
-### 4. Install JavaScript dependencies
-
-```bash
 pnpm install
-```
-
-This installs Turborepo, Expo, React Native, TypeScript, and the other JavaScript packages.
-
-### 5. Install Python dependencies
-
-```bash
 uv sync --project apps/api --all-groups
 ```
 
-This creates the Python environment and installs Django, Django REST Framework, Ruff, mypy, and
-the testing tools.
-
-### 6. Create the local environment file
+Create both ignored environment files:
 
 ```bash
 test -f .env || cp .env.example .env
+test -f apps/mobile/.env || cp apps/mobile/.env.example apps/mobile/.env
 ```
 
-This creates `.env` from the example only when `.env` does not already exist. It will not
-overwrite an existing configuration. Do not commit `.env`.
+Edit the root `.env` and provide the server-only credential:
 
-### 7. Prepare the Django database
+```dotenv
+OPENROUTER_API_KEY=your-spend-capped-key
+OPENROUTER_VISION_MODEL=google/gemini-2.5-flash
+```
+
+Never put this key in an `EXPO_PUBLIC_*` variable. For the iOS Simulator, keep
+`apps/mobile/.env` at:
+
+```dotenv
+EXPO_PUBLIC_API_URL=http://127.0.0.1:8000
+```
+
+For a physical iPhone, replace the host with the Mac's LAN address and add that address to
+`DJANGO_ALLOWED_HOSTS` in the root `.env`.
+
+Prepare the database, catalog, and local model:
 
 ```bash
 uv --project apps/api run python apps/api/manage.py migrate
-```
-
-This creates the local SQLite database tables required by Django.
-
-### 8. Import the book catalog
-
-```bash
 uv --project apps/api run python apps/api/manage.py import_catalog
-```
-
-This validates the repository-root `catalog.csv` and imports it into SQLite. Runtime matching
-queries SQLite directly; it does not read the CSV. The command is safe to run repeatedly: existing
-rows are updated only when their imported values change, unchanged rows are left alone, and the
-command reports how many rows were created, updated, or unchanged.
-
-Run this command again whenever `catalog.csv` changes. A new clone needs both `migrate` and
-`import_catalog` before catalog matching can run.
-
-### 9. Download and warm the local detector
-
-```bash
 uv --project apps/api run python apps/api/manage.py warm_detector
 ```
 
-This intentionally downloads `google/owlv2-base-patch16-ensemble` once and verifies that it loads
-on CPU. The current safetensors weights are about 620 MB; the measured local Hugging Face cache is
-about 603 MB. Shelfie stores them under the ignored `.cache/huggingface` directory by default.
-Normal API requests use that local cache and do not download model files.
+`warm_detector` intentionally downloads the off-the-shelf
+`google/owlv2-base-patch16-ensemble` weights once (about 620 MB) and verifies CPU loading.
+Normal API requests use the ignored local cache and never train or fine-tune the model.
 
-The first run needs internet access and can take several minutes. Later runs are local. If the
-weights are missing, `POST /api/v1/analyze` returns the `detector_unavailable` error with the
-warm-up instruction instead of starting an unexpected download.
-
-### 10. Start Expo and Django
-
-For normal mobile development, use two Terminal tabs. This keeps Expo interactive so its keyboard
-controls work normally.
-
-Terminal tab 1 — Django:
+The app uses native modules and therefore runs in an Expo development build, not Expo Go. Build
+and install it once:
 
 ```bash
+pnpm --filter @shelfie/mobile exec expo run:ios --device "iPhone 16e"
+```
+
+Then run the two services in separate terminals:
+
+```bash
+# Terminal 1
 pnpm --filter @shelfie/api dev
 ```
 
-Terminal tab 2 — Expo:
-
 ```bash
+# Terminal 2
 pnpm --filter @shelfie/mobile dev
 ```
 
-In the Expo terminal:
+Press `i` in the Expo terminal to open the installed development build. Restart Django after
+changing any root `.env` provider setting.
 
-- Press `i` to open the iOS Simulator.
-- Press `w` to open the web app.
-- Press `r` to reload the app.
-- Press `?` to display all Expo controls.
-- Press `Ctrl+C` to stop Expo.
+## User flow and human review
 
-If Expo asks to install the recommended Expo Go version, choose `Y`. The Expo Go version must
-support the Expo SDK used by this project.
+High-confidence matches are shown as ready to add, but are not persisted until the user taps the
+library action. `not_sure` results enter a first-class review screen. The user can:
 
-Alternatively, start both applications together through Turbo:
+- confirm the suggested catalog entry and save it immediately;
+- search the supplied catalog and replace the suggestion; or
+- discard the detection.
 
-```bash
-pnpm dev
+Unreadable and unmatched spines are never silently accepted or dropped. They have explicit states
+with correction, discard, retry, and choose-another-photo actions. Manual arbitrary-book creation
+was deliberately excluded because it would bypass the canonical catalog requirement.
+
+The app also gives explicit screens for zero detections, upload/network errors, local model errors,
+provider timeouts, and unreadable spines. Malformed provider JSON receives a structured API error
+instead of producing partial or misordered matches.
+
+## Matching against the messy catalog
+
+`catalog.csv` contains 170 canonical rows. `import_catalog` validates required fields and unique
+IDs, then idempotently imports the data into `CatalogBook`.
+
+The matcher normalizes case, punctuation, accents, initials, and `Lastname, Firstname` ordering.
+It scores every row using the best canonical, alternate, or contained-title similarity plus author
+similarity:
+
+```text
+with author: 0.75 * title_similarity + 0.25 * author_similarity
+no author:   title_similarity
 ```
 
-Turbo starts Expo and Django together, but direct Expo keyboard controls are less convenient in
-the combined output. Press `Ctrl+C` to stop both processes.
+Alternate titles receive a small source penalty and contained titles a larger one, so an omnibus
+does not automatically beat its individual volume. A match must pass score, title, author, and
+best-vs-second-place margin thresholds. Otherwise the API returns up to three review candidates;
+weak reads become `not_found`.
 
-## Verify the API
+Deliberate ambiguity includes:
 
-Open `http://localhost:8000/api/v1/health`. It should return:
+- separate UK/US Harry Potter titles (`B001`, `B002`);
+- separate illustrated and anniversary editions of *The Hobbit* (`B009`, `B010`);
+- genuinely different books called *The Alchemist*, *Home*, and *The Power*;
+- *The Lord of the Rings* and *The Chronicles of Narnia* omnibuses alongside their contained
+  volumes;
+- substring families such as *Dune* / *Dune Messiah* and *Foundation* / *Foundation and Empire*;
+- author aliases such as `J. K. Rowling`, `J.K. Rowling`, `Joanne Rowling`, and `Rowling J. K.`.
 
-```json
-{"status":"ok"}
-```
+## Local versus hosted routing
 
-The catalog must be migrated and imported before using the match endpoint. Follow first-time steps
-7 and 8 above, then start Django.
+The local OWLv2 model is good at the bounded, privacy-sensitive geometry task: find likely spine
+rectangles. It cannot reliably transcribe arbitrary typography. The hosted Gemini model receives
+the small crops and handles OCR-like visual reading. The deterministic matcher—not the hosted
+model—owns canonicalization and confidence, keeping matching testable and repeatable.
 
-### Match a title and author
+The request caps detections at 12. This bounds provider payload, latency, and cost. A truncated
+result is visible in the Expo UI with guidance to scan one shelf at a time.
 
-Send JSON to `POST /api/v1/catalog/match`:
+## Measured latency and estimated API cost
 
-```bash
-curl -X POST http://localhost:8000/api/v1/catalog/match \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Dune","author":"Frank Herbert"}'
-```
+Measurements below were taken on the development Mac with cached OWLv2 weights, Django's local
+development server, threshold `0.3`, and the committed files in `test_photos/`. They are one-run
+engineering measurements, not benchmark claims.
 
-`title` is required and `author` is optional. A valid request returns HTTP 200 with one of these
-statuses:
+| Image | Result | Cached CPU inference | Django processing | HTTP elapsed |
+| --- | ---: | ---: | ---: | ---: |
+| `bookshelf-sample.webp` (3627 x 2720) | 12 detections, truncated | 3101.74 ms | 3815.81 ms | 3.97 s |
+| `no-books-control.jpg` (640 x 480) | 0 detections | included in total | no provider call | 2.52 s |
 
-- `matched`: one confident catalog book is returned in `match`.
-- `not_sure`: up to three safe candidate summaries are returned for human review.
-- `not_found`: no reasonable catalog candidate was found.
+The zero-book path intentionally skips OpenRouter. A real billable OpenRouter request was not made
+for this repository snapshot, so hosted latency is explicitly still to be measured with the final
+spend-capped key before submission.
 
-Missing or invalid fields return HTTP 400 with field-specific validation messages. If the catalog
-has not been imported, the endpoint returns HTTP 503 with the `catalog_not_initialized` error code.
-The endpoint only matches supplied text; it does not accept or process photos.
+Cost estimate for the worst-case 12-crop request:
 
-### List or search the catalog
+- Gemini image inputs up to 384 x 384 count as 258 tokens; larger inputs are tiled in 768 x 768
+  units at 258 tokens. The narrow spine crops are estimated at 258-516 tokens each, or
+  3,096-6,192 image-input tokens total.
+- OpenRouter currently lists `google/gemini-2.5-flash` at $0.30 per million input tokens and $2.50
+  per million output tokens.
+- Estimated image-input cost: **$0.00093-$0.00186 per shelf image**.
+- Allowing up to 500 output tokens for compact JSON adds at most **$0.00125**.
+- Estimated worst-case model total: **$0.00218-$0.00311 per shelf image** (roughly 0.22-0.31 cents),
+  before any credit-purchase fee.
 
-Use `GET /api/v1/catalog` to inspect catalog summaries. The optional `q` parameter searches IDs,
-titles, authors, title aliases, author aliases, and editions. `limit` defaults to 10 and accepts
-values from 1 through 50.
+Pricing and token rules change; verify the
+[OpenRouter model page](https://openrouter.ai/google/gemini-2.5-flash) and
+[Gemini image token documentation](https://ai.google.dev/gemini-api/docs/image-understanding)
+before presenting the number.
 
-```bash
-curl "http://localhost:8000/api/v1/catalog?q=Dune&limit=5"
-```
+## API summary
 
-The response contains the total matching `count` and a limited `results` list. Results expose only
-catalog ID, title, author, and edition.
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/v1/health` | Health check |
+| `POST` | `/api/v1/analyze` | Local CPU spine detection only |
+| `POST` | `/api/v1/analyze/read` | Detection, hosted reading, and catalog matching |
+| `POST` | `/api/v1/catalog/match` | Match supplied title/author text |
+| `GET` | `/api/v1/catalog?q=...` | Search correction candidates |
+| `GET` | `/api/v1/catalog/{catalog_id}` | Full catalog detail |
+| `GET/POST` | `/api/v1/library/books` | List or save confirmed books |
+| `DELETE` | `/api/v1/library/books/{catalog_id}` | Remove a saved book |
 
-### Get one catalog book
+Uploads accept JPEG, PNG, and WebP, up to 10 MB and 40 megapixels. Filename, MIME type, and actual
+image content must agree. Temporary images and crops are removed after each request.
 
-Use `GET /api/v1/catalog/{catalog_id}` to retrieve one book's complete public catalog fields,
-including alternate titles, author aliases, and contained titles.
+## Test photos
 
-```bash
-curl http://localhost:8000/api/v1/catalog/B081
-```
+- `test_photos/bookshelf-sample.webp`: positive local-detector and truncation test.
+- `test_photos/no-books-control.jpg`: generated blank control for the zero-detection path.
 
-An unknown catalog ID returns HTTP 404 with the `catalog_book_not_found` error code.
+The assignment's live presentation photos are intentionally not included because they will be
+provided by the reviewers at demo time.
 
-### Save confirmed books to the library
+## Quality checks
 
-The saved-library API stores confirmed catalog books. The catalog must be migrated and imported
-before saving books. Saving is idempotent: a catalog book can be saved only once in the current
-single-library implementation, and repeated requests report it under `already_saved`.
-
-Save one or more confirmed catalog IDs:
-
-```bash
-curl -X POST http://localhost:8000/api/v1/library/books \
-  -H "Content-Type: application/json" \
-  -d '{"catalog_ids":["B081","B064"]}'
-```
-
-The response contains `created` and `already_saved` arrays. Each item includes the saved item ID,
-catalog ID, title, author, edition, and `saved_at` timestamp. Unknown catalog IDs return HTTP 404
-with the structured `catalog_books_not_found` error. Missing or malformed `catalog_ids` returns
-HTTP 400 with the structured `invalid_request` error.
-
-List saved books, newest first:
-
-```bash
-curl http://localhost:8000/api/v1/library/books
-```
-
-Delete one saved book by its catalog ID:
-
-```bash
-curl -X DELETE http://localhost:8000/api/v1/library/books/B081
-```
-
-Deletion returns HTTP 204. An item that is not saved returns HTTP 404 with the
-`saved_book_not_found` error. This phase has no user authentication yet; it provides the single
-local saved library required before the Expo client integration.
-
-### Detect book spines locally
-
-`POST /api/v1/analyze` accepts a multipart shelf image and runs OWLv2 entirely on the Django
-machine's CPU. It does not call hosted AI, read titles, match the catalog, or persist the upload or
-results.
-
-```bash
-curl -X POST http://localhost:8000/api/v1/analyze \
-  -F "image=@/path/to/shelf.jpg;type=image/jpeg" \
-  -F "prompt=book spine" \
-  -F "threshold=0.3"
-```
-
-The default prompt is exactly `book spine`; the default threshold is `0.3`, with accepted request
-values from `0.05` through `0.95`. Supported uploads are JPEG, PNG, and WebP. The API cross-checks
-the image content, MIME type, and filename extension, rejects files over 10 MB or 40 megapixels,
-and removes its temporary copy after inference.
-
-The response contains:
-
-- Model identifier and `cpu` device.
-- Original image dimensions.
-- Numbered boxes in original image coordinates with label and score.
-- The prompt and threshold used.
-- Model-load, preprocessing, inference, postprocessing, and total timing measurements.
-- `truncated`, which is true when detections exceed the configured 12-result cap.
-- `persisted: false`, confirming that this phase stores neither images nor results.
-
-The model is lazy-loaded once per Django process and reused for later requests. A real local test
-on a 3627×2720 WebP returned 12 boxes at threshold `0.3`; the measured cached CPU inference was
-about 3.17 seconds and total request processing was about 3.92 seconds. These numbers are specific
-to the development Mac and test image, not a general performance guarantee.
-
-Detector settings can be overridden through environment variables:
-
-| Variable | Default |
-| --- | --- |
-| `SPINE_DETECTOR_MODEL_ID` | `google/owlv2-base-patch16-ensemble` |
-| `SPINE_DETECTOR_CACHE_DIR` | `.cache/huggingface` |
-| `SPINE_DETECTOR_DEFAULT_PROMPT` | `book spine` |
-| `SPINE_DETECTOR_DEFAULT_THRESHOLD` | `0.3` |
-| `SPINE_DETECTOR_NMS_IOU_THRESHOLD` | `0.5` |
-| `SPINE_DETECTOR_MAX_DETECTIONS` | `12` |
-| `SPINE_IMAGE_MAX_UPLOAD_BYTES` | `10485760` |
-| `SPINE_IMAGE_MAX_PIXELS` | `40000000` |
-
-For a physical iPhone, change `EXPO_PUBLIC_API_URL` to the development Mac's LAN address, such as
-`http://192.168.x.x:8000`, and keep the phone and Mac on the same network.
-
-## Verify the mobile app
-
-After Expo starts:
-
-1. Press `i` to open the iOS Simulator, or scan the QR code with a physical iPhone.
-2. Allow Expo to install or update the recommended Expo Go version when prompted.
-3. Confirm that the Shelfie starter screen opens without a red error screen.
-4. Press `r` in the Expo terminal and confirm the app reloads.
-
-The Mac and physical iPhone must be on the same Wi-Fi network. If the QR code cannot connect, make
-sure macOS Firewall is not blocking Node or Expo and restart the Expo process.
-
-## Daily development workflow
-
-The full installation is normally required only once. On later days, open both Terminal tabs in
-the repository root:
-
-1. Open Terminal tab 1:
-
-   ```bash
-   nvm use
-   pnpm --filter @shelfie/api dev
-   ```
-
-2. Open Terminal tab 2:
-
-   ```bash
-   nvm use
-   pnpm --filter @shelfie/mobile dev
-   ```
-
-3. Press `i` in the Expo terminal or scan its QR code.
-4. Press `Ctrl+C` in both terminals when finished.
-
-Run `pnpm install` again after JavaScript dependencies change. Run
-`uv sync --project apps/api --all-groups` after Python dependencies change. Run Django migrations
-again after new database migrations are added. Run
-`uv --project apps/api run python apps/api/manage.py import_catalog` after catalog CSV changes.
-
-## Common development-server problems
-
-If a port is already in use, another Expo or Django process is probably still running. Return to
-the earlier Terminal and press `Ctrl+C` before starting the servers again.
-
-If the Simulator reports that the project is incompatible with Expo Go, update Expo Go when Expo
-prompts you, then reopen the project.
-
-If Expo says port 8081 is already in use, do not start another copy on 8082 unless that is
-intentional. Stop the earlier Expo process with `Ctrl+C`, then start it again.
-
-If Django says port 8000 is already in use, stop the earlier Django process with `Ctrl+C` before
-restarting it.
-
-If Expo cannot find the Simulator, open Xcode once, accept any license or component-installation
-prompts, and confirm that an iOS Simulator runtime is installed.
-
-## Quality commands
+Run all checks from the repository root:
 
 ```bash
 pnpm lint
@@ -422,48 +261,39 @@ pnpm test
 pnpm build
 ```
 
-`pnpm build` exports the Expo web target and runs Django's system check. Production deployment
-settings are intentionally not part of this initial scaffold.
+The Django suite includes real matching cases, messy-catalog ambiguity, catalog import and lookup,
+library persistence, image validation, detector post-processing, provider JSON validation,
+zero-detection routing, timeouts, and malformed responses.
 
-Run all four commands before committing a completed development phase.
+## Key decisions and tradeoffs
 
-## Adding dependencies
+- **Crops instead of the full photo:** less hosted data and bounded cost, but detector misses cannot
+  be recovered by the VLM.
+- **Deterministic matching:** explainable scores and stable tests, at the cost of less semantic
+  flexibility than embeddings or an LLM matcher.
+- **SQLite and a single library:** enough to prove persistence; no authentication or multi-user
+  isolation.
+- **Twelve-detection cap:** predictable demo latency and cost; large shelves require multiple
+  scans.
+- **No arbitrary manual entries:** correction remains tied to the supplied canonical catalog;
+  out-of-catalog books are discarded.
+- **No image persistence:** better privacy and a smaller data model; the app cannot later show the
+  original crop for saved books.
 
-Install Expo and React Native dependencies directly in the mobile application so native module
-autolinking can find them:
+## Unfinished and another day
 
-```bash
-pnpm --filter @shelfie/mobile exec expo install <package-name>
-```
+Before sending the repository link, run one authorized end-to-end request with the spend-capped
+OpenRouter key and record actual provider/full-pipeline latency, returned titles, token usage, and
+billed cost. This snapshot includes the complete provider integration and mocked failure tests but
+does not claim a billable external call that was not made.
 
-Add Django or Python dependencies through uv:
+With another day I would add a small recorded native E2E suite, batch/retry hosted crops separately
+so one provider failure does not repeat local inference, retain short-lived crop IDs for richer
+review, and measure accuracy across more real cluttered shelves. I would not add authentication or
+deployment unless the product scope changed.
 
-```bash
-uv add --project apps/api <package-name>
-```
+## Submission discipline
 
-Commit both lockfiles when dependencies change: `pnpm-lock.yaml` and `apps/api/uv.lock`.
-
-## Git workflow
-
-Check the current state before making a commit:
-
-```bash
-git branch --show-current
-git status
-```
-
-Normal implementation work and setup improvements are committed on `develop`. Do not commit
-`.env`, SQLite databases, virtual environments, `node_modules`, Expo build output, or caches.
-
-## Catalog data flow
-
-`catalog.csv` is the version-controlled source used to seed the canonical catalog. The
-`import_catalog` command validates and copies those records into the `CatalogBook` SQLite table.
-The deterministic matcher queries that table and returns `matched`, `not_sure`, or `not_found`.
-Ambiguous editions, same-title books, omnibus relationships, aliases, and missing-author inputs
-remain review cases instead of being silently accepted.
-
-The local detector is deliberately separate from language AI: OWLv2 only returns candidate book
-spine regions. A later hosted VLM phase will read possible titles and authors from those crops.
-Mobile capture, hosted extraction, review, and personal-library persistence remain later phases.
+Development is committed on `develop`. Submit the exact branch URL or make `develop` the GitHub
+default branch. After sending the repository link, do not commit again; the assignment explicitly
+requires the presented repository to match the submitted snapshot.
