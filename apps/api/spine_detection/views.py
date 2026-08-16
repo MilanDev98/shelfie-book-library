@@ -110,8 +110,9 @@ class ReadShelfView(GenericAPIView[Any]):
                 {"error": {"code": "detection_failed", "message": str(error)}}, status=500
             )
         except VisionProviderError as error:
+            status_code = 504 if error.code == "vision_provider_timeout" else 502
             return Response(
-                {"error": {"code": "vision_provider_failed", "message": str(error)}}, status=502
+                {"error": {"code": error.code, "message": str(error)}}, status=status_code
             )
 
         books: list[dict[str, object]] = []
@@ -146,8 +147,16 @@ class ReadShelfView(GenericAPIView[Any]):
                 "status": "completed",
                 "model": result.model_id,
                 "vision_model": settings.OPENROUTER_VISION_MODEL,
+                "detection_count": len(result.boxes),
+                "truncated": result.truncated,
                 "books": books,
-                "timings_ms": {"total": total_ms},
+                "timings_ms": {
+                    "model_load": result.timings.model_load_ms,
+                    "preprocess": result.timings.preprocess_ms,
+                    "inference": result.timings.inference_ms,
+                    "postprocess": result.timings.postprocess_ms,
+                    "total": total_ms,
+                },
                 "persisted": False,
             }
         )

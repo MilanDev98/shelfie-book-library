@@ -3,9 +3,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase, override_settings
+from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase, override_settings
 from PIL import Image
 
+from spine_detection.openrouter import SpineReading, VisionProviderError
 from spine_detection.types import (
     DetectionBox,
     DetectorInferenceError,
@@ -59,6 +61,20 @@ class UnavailableDetector:
 class FailingDetector:
     def detect(self, image_path: Path, prompt: str, threshold: float) -> DetectorResult:
         raise DetectorInferenceError("The local detector could not process this image.")
+
+
+def detector_result(*, boxes: tuple[DetectionBox, ...] | None = None) -> DetectorResult:
+    return DetectorResult(
+        model_id="google/owlv2-base-patch16-ensemble",
+        device="cpu",
+        image_width=120,
+        image_height=80,
+        boxes=boxes
+        if boxes is not None
+        else (DetectionBox(10.0, 5.0, 30.0, 75.0, 0.91234, "book spine"),),
+        truncated=False,
+        timings=DetectorTimings(12.0, 3.0, 25.0, 2.0),
+    )
 
 
 class AnalyzeShelfApiTests(SimpleTestCase):
@@ -195,3 +211,65 @@ class AnalyzeShelfApiTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 500)
         self.assertEqual(response.json()["error"]["code"], "detection_failed")
+
+
+class ReadShelfApiTests(TestCase):
+    endpoint = "/api/v1/analyze/read"
+
+    @classmethod
+    def setUpTestData(cls) -> None:
+        call_command("import_catalog", verbosity=0)
+
+    def test_reads_and_matches_detected_spines(self) -> None:
+        readings = [SpineReading(id=1, title="Dune", author="Frank Herbert", readable=True)]
+        with patch(
+            "spine_detection.views.detect_and_read",
+            return_value=(detector_result(), readings, 55.5),
+        ):
+            response = self.client.post(self.endpoint, {"image": image_upload()})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["detection_count"], 1)
+        self.assertFalse(payload["truncated"])
+        self.assertEqual(payload["books"][0]["catalog"]["status"], "matched")
+        self.assertEqual(payload["books"][0]["catalog"]["match"]["catalog_id"], "B081")
+        self.assertEqual(payload["timings_ms"]["inference"], 25.0)
+        self.assertEqual(payload["timings_ms"]["total"], 55.5)
+        self.assertFalse(payload["persisted"])
+
+    def test_returns_no_books_when_the_detector_finds_no_spines(self) -> None:
+        with patch(
+            "spine_detection.views.detect_and_read",
+            return_value=(detector_result(boxes=()), [], 10.0),
+        ):
+            response = self.client.post(self.endpoint, {"image": image_upload()})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["detection_count"], 0)
+        self.assertEqual(response.json()["books"], [])
+
+    def test_returns_a_distinct_provider_timeout(self) -> None:
+        error = VisionProviderError(
+            "OpenRouter timed out.",
+            code="vision_provider_timeout",
+        )
+        with patch("spine_detection.views.detect_and_read", side_effect=error):
+            response = self.client.post(self.endpoint, {"image": image_upload()})
+
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(response.json()["error"]["code"], "vision_provider_timeout")
+
+    def test_returns_a_distinct_malformed_provider_response(self) -> None:
+        error = VisionProviderError(
+            "OpenRouter returned malformed book-reading JSON.",
+            code="vision_provider_malformed_response",
+        )
+        with patch("spine_detection.views.detect_and_read", side_effect=error):
+            response = self.client.post(self.endpoint, {"image": image_upload()})
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.json()["error"]["code"],
+            "vision_provider_malformed_response",
+        )

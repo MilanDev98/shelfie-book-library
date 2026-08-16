@@ -30,5 +30,5 @@ def detect_and_read(
             buffer = BytesIO()
             crop.save(buffer, format="JPEG", quality=85)
             crops.append((index, buffer.getvalue()))
-        readings = read_spines(crops)
+        readings = read_spines(crops) if crops else []
     return result, readings, round((perf_counter() - started) * 1000, 2)

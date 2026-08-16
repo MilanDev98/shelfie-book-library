@@ -135,7 +135,7 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 ).split(",")
 
 
-# Hosted vision provider configuration. The provider itself is added in a later phase.
+# Hosted vision provider configuration used by the spine-reading pipeline.
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_VISION_MODEL = os.getenv(
     "OPENROUTER_VISION_MODEL",
