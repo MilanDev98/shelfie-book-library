@@ -1,98 +1,112 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+/* eslint-disable react/no-unescaped-entities */
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { SymbolView } from 'expo-symbols';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import {
+  EmptyState,
+  MockShelfPhoto,
+  ReviewCard,
+  ShelfieButton,
+  ShelfieCard,
+  ShelfieProcessingState,
+  ShelfieText,
+  StatusBadge,
+  OutcomeState,
+  setShelfieTabBarVisible,
+} from '@/components/shelfie';
+import { ShelfieBottomBarHeight, ShelfieColors, ShelfieRadius, ShelfieSpacing } from '@/constants/theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
+const tips = ['Keep book spines visible', 'Avoid glare and shadows', 'Try to keep the camera straight'];
+type ScanState = 'home' | 'capture' | 'processing' | 'results' | 'review' | 'search' | 'manual' | 'nobooks' | 'nomatch' | 'unreadable' | 'error' | 'timeout';
+type DemoBook = { id: string; title: string; author: string; detectedTitle: string; detectedAuthor: string; confidence: number; status: 'matched' | 'review' | 'no-match' | 'unreadable'; spineColor: string };
+
+const books: DemoBook[] = [
+  { id: '1984', title: '1984', author: 'George Orwell', detectedTitle: '1984', detectedAuthor: 'George Orwell', confidence: 96, status: 'matched', spineColor: '#7E4A3A' },
+  { id: 'midnight-library', title: 'The Midnight Library', author: 'Matt Haig', detectedTitle: 'The Midnight Library', detectedAuthor: 'Matt Haig', confidence: 71, status: 'review', spineColor: '#B27B3C' },
+  { id: 'normal-people', title: 'Normal People', author: 'Sally Rooney', detectedTitle: 'Normal Peop...', detectedAuthor: 'Sally R.', confidence: 68, status: 'review', spineColor: '#74634F' },
+  { id: 'secret-history', title: 'The Secret History', author: 'Donna Tartt', detectedTitle: 'The Secret Hist...', detectedAuthor: 'Donna T.', confidence: 62, status: 'review', spineColor: '#7C6250' },
+  { id: 'dune', title: 'Dune', author: 'Frank Herbert', detectedTitle: 'DUNE', detectedAuthor: 'Frank Herbert', confidence: 93, status: 'matched', spineColor: '#2F5E58' },
+  { id: 'atomic-habits', title: 'Atomic Habits', author: 'James Clear', detectedTitle: 'Atomic Habits', detectedAuthor: 'James Clear', confidence: 91, status: 'matched', spineColor: '#B6A36B' },
+];
+
+function DeviceChrome() {
+  return <View style={styles.deviceStatusBar}>
+    <ShelfieText variant="label" style={styles.statusTime}>9:41</ShelfieText><View style={styles.dynamicIsland} />
+    <View style={styles.statusIndicators}><View style={styles.signalBars}>{[styles.signalBarOne, styles.signalBarTwo, styles.signalBarThree, styles.signalBarFour].map((bar) => <View key={bar.height} style={[styles.signalBar, bar]} />)}</View><View style={styles.battery}><View style={styles.batteryFill} /></View></View>
+  </View>;
 }
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+function Header({ title, onBack, trailing }: { title: string; onBack: () => void; trailing?: ReactNode }) {
+  return <View style={styles.header}><Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={onBack} style={styles.backButton}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={18} tintColor={ShelfieColors.primary} weight="regular" /></Pressable><ShelfieText variant="title" style={styles.headerTitle}>{title}</ShelfieText>{trailing ?? <View style={styles.headerSpacer} />}</View>;
+}
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+function Footer({ children }: { children: ReactNode }) { return <View style={styles.footer}>{children}</View>; }
+function SectionLabel({ children, tone = 'muted' }: { children: string; tone?: 'muted' | 'green' | 'amber' }) {
+  return <View style={styles.sectionLabelRow}><ShelfieText variant="badge" color={tone === 'green' ? 'primary' : tone === 'amber' ? 'review' : 'quiet'} style={styles.sectionLabel}>{children}</ShelfieText><View style={[styles.sectionRule, tone === 'green' && styles.greenRule, tone === 'amber' && styles.amberRule]} /></View>;
+}
+function SpineBook({ book, compact = false }: { book: DemoBook; compact?: boolean }) { return <View style={[styles.spineBook, compact && styles.compactSpineBook, { backgroundColor: book.spineColor }]}><ShelfieText variant="badge" style={styles.spineText}>{book.title}</ShelfieText></View>; }
+function ReviewListCard({ book, onPress }: { book: DemoBook; onPress: () => void }) { return <ReviewCard book={book} onPress={onPress} showDetectedText={false} style={styles.reviewListCard} />; }
+function DemoStates({ onSelect }: { onSelect: (state: ScanState) => void }) {
+  return <View style={styles.demoStates}><ShelfieText variant="caption" color="quiet">Preview another example state</ShelfieText><View style={styles.demoStateRow}>{(['results', 'nobooks', 'nomatch', 'unreadable', 'error', 'timeout'] as const).map((state) => <Pressable key={state} onPress={() => onSelect(state)} style={styles.demoChip}><ShelfieText variant="caption" style={styles.demoChipText}>{state === 'results' ? 'Results' : state === 'nobooks' ? 'No books' : state === 'nomatch' ? 'No match' : state[0].toUpperCase() + state.slice(1)}</ShelfieText></Pressable>)}</View></View>;
+}
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+export default function ScanHomeScreen() {
+  const router = useRouter();
+  const [screen, setScreen] = useState<ScanState>('home');
+  const [hasPhoto, setHasPhoto] = useState(false);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [query, setQuery] = useState('midnight library');
+  const [manualTitle, setManualTitle] = useState('The Midnight Library');
+  const [manualAuthor, setManualAuthor] = useState('Matt Haig');
+  useEffect(() => {
+    setShelfieTabBarVisible(screen === 'home');
+    return () => setShelfieTabBarVisible(true);
+  }, [screen]);
+  const reviewBooks = books.filter((book) => book.status === 'review');
+  const currentReview = reviewBooks[reviewIndex] ?? reviewBooks[0];
+  const catalogResults = useMemo(() => [books[1], { ...books[1], id: 'midnight-library-2', title: "The Midnight Library (Collector's Edition)" }], []);
+  const goHome = () => { setScreen('home'); setHasPhoto(false); };
+  const openPhoto = () => { setHasPhoto(true); setScreen('capture'); };
+  const openCapture = () => { setHasPhoto(false); setScreen('capture'); };
+  const openProcessing = () => setScreen('processing');
+  const openLibrary = () => router.push('/explore?variant=populated');
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
+  const renderHome = () => <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <View><ShelfieText variant="display">Shelfie</ShelfieText><ShelfieText variant="body" color="muted" style={styles.subtitle}>Turn your bookshelf into a personal library.</ShelfieText></View>
+    <ShelfieCard tone="tinted" style={styles.explainer}><View style={styles.infoIcon}><SymbolView name={{ ios: 'book.closed', android: 'menu_book', web: 'menu_book' }} size={19} tintColor={ShelfieColors.onPrimary} weight="regular" /></View><ShelfieText variant="body" style={styles.explainerCopy}>Take a photo of your bookshelf and Shelfie will identify the books for you.</ShelfieText></ShelfieCard>
+    <View style={styles.actions}><ShelfieButton size="lg" accessibilityLabel="Scan your bookshelf" onPress={openCapture}><View style={styles.buttonContent}><SymbolView name={{ ios: 'camera', android: 'photo_camera', web: 'camera' }} size={20} tintColor={ShelfieColors.onPrimary} weight="regular" /><ShelfieText variant="button" style={styles.primaryButtonText}>Scan Bookshelf</ShelfieText></View></ShelfieButton><ShelfieButton size="lg" variant="secondary" accessibilityLabel="Choose a bookshelf photo" onPress={openPhoto}><View style={styles.buttonContent}><SymbolView name={{ ios: 'photo', android: 'image', web: 'image' }} size={20} tintColor={ShelfieColors.primary} weight="regular" /><ShelfieText variant="button" style={styles.secondaryButtonText}>Choose Photo</ShelfieText></View></ShelfieButton></View>
+    <View style={styles.tips}><ShelfieText variant="badge" color="quiet" style={styles.tipsHeading}>For better results</ShelfieText><View style={styles.tipList}>{tips.map((tip) => <View key={tip} style={styles.tipRow}><View style={styles.tipDot} /><ShelfieText variant="label">{tip}</ShelfieText></View>)}</View></View>
+    <EmptyState description="Scan your first bookshelf to get started." icon={<SymbolView name={{ ios: 'books.vertical', android: 'menu_book', web: 'menu_book' }} size={22} tintColor={ShelfieColors.quiet} weight="regular" />} style={styles.emptyLibrary} titleVariant="emptyTitle" descriptionVariant="emptyDescription" title="Your library is empty." />
+  </ScrollView>;
+
+  const renderCapture = () => <View style={styles.flexScreen}><Header title="Add Bookshelf Photo" onBack={goHome} /><ScrollView contentContainerStyle={styles.innerContent} showsVerticalScrollIndicator={false}>{hasPhoto ? <><MockShelfPhoto /><ShelfieText variant="title" style={styles.readyTitle}>Ready to analyze?</ShelfieText><ShelfieText variant="body" color="muted" style={styles.paragraph}>We'll detect the book spines, read the visible titles and authors, and match them to the catalog.</ShelfieText></> : <View style={styles.photoPlaceholder}><View style={styles.placeholderIcon}><SymbolView name={{ ios: 'camera', android: 'photo_camera', web: 'camera' }} size={26} tintColor={ShelfieColors.primary} weight="regular" /></View><ShelfieText variant="bodyStrong">Take a bookshelf photo</ShelfieText><ShelfieText variant="caption" color="quiet" style={styles.placeholderCopy}>Frame one shelf at a time for the best results.</ShelfieText></View>}</ScrollView><Footer>{hasPhoto ? <><ShelfieButton size="lg" onPress={openProcessing}>Analyze Shelf</ShelfieButton><ShelfieButton variant="ghost" size="sm" onPress={openPhoto}>Choose Another Photo</ShelfieButton></> : <><ShelfieButton size="lg" onPress={openPhoto}>Take Photo</ShelfieButton><ShelfieButton size="md" variant="secondary" onPress={openPhoto}>Choose from Library</ShelfieButton></>}</Footer></View>;
+
+  const renderProcessing = () => <View style={styles.flexScreen}><ScrollView contentContainerStyle={styles.innerContent} showsVerticalScrollIndicator={false}><View style={styles.photoSummary}><MockShelfPhoto compact /><View style={styles.photoSummaryCopy}><ShelfieText variant="badge" color="subtle">YOUR PHOTO</ShelfieText><ShelfieText variant="caption" color="muted" style={styles.summaryText}>Kept on your device while we work.</ShelfieText></View></View><ShelfieText variant="display" style={styles.analysisTitle}>Analyzing your bookshelf</ShelfieText><ShelfieText variant="body" color="muted">This can take a moment.</ShelfieText><ShelfieProcessingState activeStep={1} style={styles.processingCard} /><View style={styles.infoNote}><ShelfieText variant="caption" color="quiet">ⓘ  You'll be able to review anything Shelfie isn't confident about.</ShelfieText></View><DemoStates onSelect={setScreen} /></ScrollView><Footer><ShelfieButton variant="ghost" size="sm" onPress={goHome}>Cancel</ShelfieButton></Footer></View>;
+
+  const renderResults = () => <View style={styles.flexScreen}><Header title="Books Found" onBack={goHome} /><ScrollView contentContainerStyle={styles.innerContent} showsVerticalScrollIndicator={false}><ShelfieCard style={styles.summaryCard}><View style={styles.summaryRow}><MockShelfPhoto compact /><View><ShelfieText variant="title">8 books found</ShelfieText><ShelfieText variant="caption" color="quiet" style={styles.summaryText}>From one bookshelf photo</ShelfieText></View></View><View style={styles.divider} /><ShelfieText variant="body">●  5 matched  ·  <ShelfieText style={styles.reviewCopy}>●  3 need review</ShelfieText></ShelfieText></ShelfieCard><View style={styles.section}><SectionLabel tone="amber">Needs Review</SectionLabel><ShelfieText variant="caption" color="quiet" style={styles.sectionHint}>Nothing here is saved until you confirm it.</ShelfieText>{reviewBooks.map((book) => <ReviewListCard key={book.id} book={book} onPress={() => { setReviewIndex(reviewBooks.indexOf(book)); setScreen('review'); }} />)}</View><View style={styles.section}><SectionLabel tone="green">Ready to Add</SectionLabel>{books.filter((book) => book.status === 'matched').map((book) => <ReviewCard key={book.id} book={book} showDetectedText={false} style={styles.reviewListCard} />)}</View><DemoStates onSelect={setScreen} /></ScrollView><Footer><ShelfieButton size="lg" onPress={() => setScreen('review')}>Review 3 Books</ShelfieButton><ShelfieButton size="md" variant="secondary" onPress={openLibrary}>Add 5 Books to Library</ShelfieButton></Footer></View>;
+
+  const renderReview = () => <View style={styles.flexScreen}><Header title="Review Book" onBack={() => setScreen('results')} trailing={<ShelfieText variant="caption" color="quiet" style={styles.progressPill}>{reviewIndex + 1} of {reviewBooks.length}</ShelfieText>} /><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${((reviewIndex + 1) / reviewBooks.length) * 100}%` }]} /></View><ScrollView contentContainerStyle={styles.innerContent} showsVerticalScrollIndicator={false}><View style={styles.cropCard}><SpineBook book={currentReview} /><View><ShelfieText variant="badge" style={styles.cropLabel}>SPINE CROP</ShelfieText><ShelfieText variant="caption" style={styles.cropCopy}>Cropped from your photo, shelf position {reviewIndex + 4}.</ShelfieText></View></View><ShelfieText variant="badge" color="quiet" style={styles.formLabel}>DETECTED</ShelfieText><ShelfieCard tone="tinted" style={styles.detectedCard}><ShelfieText variant="bodyStrong">“{currentReview.detectedTitle}”</ShelfieText><ShelfieText variant="body" color="quiet">“{currentReview.detectedAuthor}”</ShelfieText></ShelfieCard><ShelfieText variant="badge" color="quiet" style={styles.formLabel}>SUGGESTED MATCH</ShelfieText><ShelfieCard style={styles.suggestedCard}><ShelfieText variant="display" style={styles.suggestedTitle}>{currentReview.title}</ShelfieText><ShelfieText variant="body" color="muted">{currentReview.author}</ShelfieText><View style={styles.confidenceDivider} /><View style={styles.confidenceRow}><ShelfieText variant="caption" color="quiet">Confidence</ShelfieText><View style={styles.confidenceBadges}><StatusBadge status="review" /><ShelfieText variant="bodyStrong" style={styles.confidenceValue}>{currentReview.confidence}%</ShelfieText></View></View><View style={styles.confidenceMeter}><View style={[styles.confidenceFill, { width: `${currentReview.confidence}%` }]} /></View></ShelfieCard></ScrollView><Footer><ShelfieButton size="lg" onPress={() => reviewIndex + 1 < reviewBooks.length ? setReviewIndex(reviewIndex + 1) : setScreen('results')}>✓  Confirm Match</ShelfieButton><View style={styles.reviewActionRow}><ShelfieButton size="sm" variant="secondary" style={styles.reviewCorrectButton} onPress={() => setScreen('search')}>Correct Match</ShelfieButton><ShelfieButton size="sm" variant="destructive" style={styles.reviewDiscardButton} onPress={() => setScreen('results')}>Discard</ShelfieButton></View><ShelfieText variant="caption" color="quiet" style={styles.reviewFooterNote}>Confirm if this is the correct book. Choose Correct Match to search the catalog manually.</ShelfieText></Footer></View>;
+
+  const renderSearch = () => <View style={styles.flexScreen}><Header title="Find the Correct Book" onBack={() => setScreen('review')} /><ScrollView contentContainerStyle={styles.innerContent} showsVerticalScrollIndicator={false}><View style={styles.detectedSummary}><SpineBook book={currentReview} compact /><View><ShelfieText variant="badge" color="quiet">DETECTED</ShelfieText><ShelfieText variant="bodyStrong" style={styles.searchDetected}>{currentReview.detectedTitle}</ShelfieText></View></View><View style={styles.searchBox}><SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor={ShelfieColors.quiet} weight="regular" /><TextInput accessibilityLabel="Search catalog" value={query} onChangeText={setQuery} placeholder="Search title or author" placeholderTextColor={ShelfieColors.quiet} style={styles.searchInput} /></View><ShelfieText variant="caption" color="quiet" style={styles.resultsCount}>2 results</ShelfieText><ShelfieText variant="badge" color="quiet" style={styles.formLabel}>CATALOG RESULTS</ShelfieText>{catalogResults.map((book, index) => <Pressable key={book.id} onPress={() => setQuery(book.title)} style={[styles.catalogResult, index === 0 && styles.catalogSelected]}><View style={styles.catalogCopy}><ShelfieText variant="bodyStrong">{book.title}</ShelfieText><ShelfieText variant="caption" color="muted">{book.author}</ShelfieText><ShelfieText variant="caption" color="quiet" style={styles.edition}>Paperback · {index === 0 ? '2019' : '2020'}</ShelfieText></View><View style={[styles.radio, index === 0 && styles.radioSelected]}>{index === 0 ? <ShelfieText style={styles.radioCheck}>✓</ShelfieText> : null}</View></Pressable>)}<ShelfieCard tone="tinted" style={styles.manualCard}><ShelfieText variant="bodyStrong">No correct match?</ShelfieText><ShelfieText variant="caption" color="quiet" style={styles.manualCopy}>Add the book yourself — just a title and author.</ShelfieText><ShelfieButton size="sm" variant="secondary" onPress={() => setScreen('manual')}>Enter Book Manually</ShelfieButton></ShelfieCard></ScrollView><Footer><ShelfieButton size="lg" onPress={() => setScreen('review')}>Use This Book</ShelfieButton></Footer></View>;
+
+  const renderManual = () => <View style={styles.flexScreen}><Header title="Enter Book Manually" onBack={() => setScreen('search')} /><ScrollView contentContainerStyle={styles.innerContent} showsVerticalScrollIndicator={false}><ShelfieText variant="body" color="muted">Add what you can see on the spine. You can edit it later in your library.</ShelfieText><ShelfieText variant="label" style={styles.formLabel}>Title</ShelfieText><TextInput accessibilityLabel="Book title" value={manualTitle} onChangeText={setManualTitle} placeholder="The Midnight Library" placeholderTextColor={ShelfieColors.quiet} style={styles.field} /><ShelfieText variant="label" style={styles.formLabel}>Author</ShelfieText><TextInput accessibilityLabel="Book author" value={manualAuthor} onChangeText={setManualAuthor} placeholder="Matt Haig" placeholderTextColor={ShelfieColors.quiet} style={styles.field} /><View style={styles.attachmentNote}><SpineBook book={currentReview} compact /><ShelfieText variant="caption" color="quiet" style={styles.attachmentCopy}>This spine crop stays attached to the book you add.</ShelfieText></View></ScrollView><Footer><ShelfieButton size="lg" onPress={() => setScreen('results')}>Save Book</ShelfieButton><ShelfieButton size="sm" variant="ghost" onPress={() => setScreen('search')}>Cancel</ShelfieButton></Footer></View>;
+
+  const renderOutcome = () => <OutcomeState state={screen as 'nobooks' | 'nomatch' | 'unreadable' | 'error' | 'timeout'} book={currentReview} onBack={goHome} onChoosePhoto={openPhoto} onCorrect={() => setScreen('search')} onDiscard={() => setScreen('results')} onRetry={screen === 'timeout' || screen === 'error' ? openProcessing : openCapture} />;
+
+  const body = screen === 'home' ? renderHome() : screen === 'capture' ? renderCapture() : screen === 'processing' ? renderProcessing() : screen === 'results' ? renderResults() : screen === 'review' ? renderReview() : screen === 'search' ? renderSearch() : screen === 'manual' ? renderManual() : renderOutcome();
+  return <View style={[styles.screen, screen !== 'home' && styles.overlayScreen]}><StatusBar style="dark" /><DeviceChrome /><SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>{body}</SafeAreaView></View>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  screen: { backgroundColor: ShelfieColors.paper, flex: 1 }, overlayScreen: { bottom: 0, elevation: 10, left: 0, position: 'absolute', right: 0, top: 0, zIndex: 10 }, safeArea: { alignItems: 'center', flex: 1, width: '100%' },
+  deviceStatusBar: { alignItems: 'center', flexDirection: 'row', height: 52, justifyContent: 'space-between', paddingHorizontal: 26, position: 'relative', width: '100%' }, statusTime: { color: ShelfieColors.ink, fontSize: 15, fontWeight: '600', lineHeight: 15 }, dynamicIsland: { backgroundColor: '#12100E', borderRadius: ShelfieRadius.full, height: 28, left: '50%', position: 'absolute', top: 11, transform: [{ translateX: -52 }], width: 104 }, statusIndicators: { alignItems: 'flex-end', flexDirection: 'row', gap: 6 }, signalBars: { alignItems: 'flex-end', flexDirection: 'row', gap: 2 }, signalBar: { backgroundColor: ShelfieColors.ink, borderRadius: 1, width: 3 }, signalBarOne: { height: 5 }, signalBarTwo: { height: 8 }, signalBarThree: { height: 11 }, signalBarFour: { height: 13 }, battery: { borderColor: ShelfieColors.ink, borderRadius: 4, borderWidth: 1.5, height: 12, padding: 1.5, width: 24 }, batteryFill: { backgroundColor: ShelfieColors.ink, borderRadius: 2, height: '100%', width: '70%' },
+  content: { alignSelf: 'center', maxWidth: 520, paddingBottom: ShelfieBottomBarHeight + ShelfieSpacing.xs, paddingHorizontal: ShelfieSpacing.lg, paddingTop: ShelfieSpacing.xs, width: '100%' }, innerContent: { alignSelf: 'center', maxWidth: 520, paddingBottom: 22, paddingHorizontal: ShelfieSpacing.lg, paddingTop: 4, width: '100%' }, flexScreen: { flex: 1, width: '100%' }, subtitle: { marginTop: 6, maxWidth: 280 }, explainer: { alignItems: 'flex-start', flexDirection: 'row', gap: ShelfieSpacing.sm, marginTop: ShelfieSpacing.lg }, infoIcon: { alignItems: 'center', backgroundColor: ShelfieColors.primary, borderRadius: ShelfieRadius.md, flexShrink: 0, height: 36, justifyContent: 'center', width: 36 }, explainerCopy: { flex: 1, paddingTop: ShelfieSpacing.xxs }, buttonContent: { alignItems: 'center', flexDirection: 'row', gap: 10 }, primaryButtonText: { color: ShelfieColors.onPrimary }, secondaryButtonText: { color: ShelfieColors.primary }, actions: { gap: ShelfieSpacing.xs, marginTop: ShelfieSpacing.lg }, tips: { marginTop: ShelfieSpacing.xxl }, tipsHeading: { letterSpacing: 1.1, textTransform: 'uppercase' }, tipList: { gap: ShelfieSpacing.sm, marginTop: ShelfieSpacing.sm }, tipRow: { alignItems: 'center', flexDirection: 'row', gap: ShelfieSpacing.sm }, tipDot: { backgroundColor: ShelfieColors.border, borderRadius: ShelfieRadius.full, height: ShelfieSpacing.xxs, width: ShelfieSpacing.xxs }, emptyLibrary: { marginTop: ShelfieSpacing.xxl },
+  header: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingBottom: 12, paddingHorizontal: 20, paddingTop: 4, width: '100%' }, backButton: { alignItems: 'center', backgroundColor: ShelfieColors.surface, borderColor: ShelfieColors.border, borderRadius: ShelfieRadius.md, borderWidth: 1, height: 38, justifyContent: 'center', width: 38 }, backArrow: { color: ShelfieColors.primary, fontSize: 29, lineHeight: 30, marginTop: -4 }, headerTitle: { flex: 1 }, headerSpacer: { width: 38 }, progressPill: { backgroundColor: ShelfieColors.surfaceTint, borderRadius: ShelfieRadius.sm, paddingHorizontal: 10, paddingVertical: 7 }, footer: { backgroundColor: ShelfieColors.paper, borderTopColor: '#EEE8DC', borderTopWidth: 1, gap: 9, paddingBottom: 26, paddingHorizontal: 20, paddingTop: 13, width: '100%' }, readyTitle: { marginTop: 22 }, paragraph: { marginTop: 7 }, photoPlaceholder: { alignItems: 'center', backgroundColor: '#F4F1E8', borderColor: '#D7CDBB', borderRadius: 20, borderStyle: 'dashed', borderWidth: 1.5, height: 340, justifyContent: 'center', paddingHorizontal: 24 }, placeholderIcon: { alignItems: 'center', backgroundColor: ShelfieColors.surface, borderColor: ShelfieColors.borderSoft, borderRadius: 18, borderWidth: 1, height: 58, justifyContent: 'center', marginBottom: 14, width: 58 }, placeholderCopy: { marginTop: 7, maxWidth: 220, textAlign: 'center' }, photoSummary: { alignItems: 'center', flexDirection: 'row', gap: 14 }, photoSummaryCopy: { flex: 1 }, summaryText: { marginTop: 8 }, analysisTitle: { marginTop: 30, maxWidth: 280 }, processingCard: { marginTop: 28 }, infoNote: { marginTop: 18, paddingHorizontal: 2 }, demoStates: { marginTop: 28 }, demoStateRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 9 }, demoChip: { backgroundColor: ShelfieColors.surfaceTint, borderRadius: ShelfieRadius.sm, paddingHorizontal: 10, paddingVertical: 7 }, demoChipText: { color: ShelfieColors.primary },
+  summaryCard: { marginBottom: 4 }, summaryRow: { alignItems: 'center', flexDirection: 'row', gap: 12 }, divider: { backgroundColor: '#F0EADE', height: 1, marginVertical: 16 }, reviewCopy: { color: ShelfieColors.review }, section: { marginTop: 26 }, sectionLabelRow: { alignItems: 'center', flexDirection: 'row', gap: 8 }, sectionLabel: { letterSpacing: 1, textTransform: 'uppercase' }, sectionRule: { backgroundColor: '#EFE7D6', flex: 1, height: 1 }, greenRule: { backgroundColor: '#E7EFE8' }, amberRule: { backgroundColor: '#EFE7D6' }, sectionHint: { marginTop: 9 }, reviewListCard: { marginTop: 10 }, progressTrack: { backgroundColor: ShelfieColors.divider, borderRadius: ShelfieRadius.full, height: 4, marginBottom: 14, marginHorizontal: 20, overflow: 'hidden' }, progressFill: { backgroundColor: ShelfieColors.primary, borderRadius: ShelfieRadius.full, height: '100%' }, cropCard: { alignItems: 'center', backgroundColor: ShelfieColors.spine, borderRadius: 18, flexDirection: 'row', gap: 16, padding: 16 }, cropLabel: { color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }, cropCopy: { color: 'rgba(255,255,255,0.72)', marginTop: 9, maxWidth: 170 }, formLabel: { letterSpacing: 1, marginTop: 22, textTransform: 'uppercase' }, detectedCard: { marginTop: 11 }, suggestedCard: { borderColor: '#EBD9B4', borderWidth: 1.5, marginTop: 11 }, suggestedTitle: { fontSize: 26, lineHeight: 30 }, badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 13 }, reviewActions: { gap: 9, marginTop: 22 },
+  detectedSummary: { alignItems: 'center', backgroundColor: ShelfieColors.surfaceTint, borderRadius: 16, flexDirection: 'row', gap: 12, padding: 14 }, searchDetected: { marginTop: 5 }, searchBox: { alignItems: 'center', backgroundColor: ShelfieColors.surface, borderColor: ShelfieColors.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 10, height: 48, marginTop: 18, paddingHorizontal: 14 }, searchInput: { color: ShelfieColors.ink, flex: 1, fontFamily: 'DMSans', fontSize: 15 }, catalogResult: { alignItems: 'center', backgroundColor: ShelfieColors.surface, borderColor: ShelfieColors.borderSoft, borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, padding: 14 }, catalogSelected: { borderColor: '#D79A2B', borderWidth: 1.5 }, catalogCopy: { flex: 1 }, edition: { marginTop: 8 }, radio: { alignItems: 'center', borderColor: ShelfieColors.border, borderRadius: ShelfieRadius.full, borderWidth: 1.5, height: 24, justifyContent: 'center', width: 24 }, radioSelected: { backgroundColor: ShelfieColors.primary, borderColor: ShelfieColors.primary }, radioCheck: { color: ShelfieColors.onPrimary, fontSize: 13 }, manualCard: { marginTop: 22 }, manualCopy: { marginBottom: 12, marginTop: 6 }, field: { backgroundColor: ShelfieColors.surface, borderColor: '#DED5C6', borderRadius: 14, borderWidth: 1, color: ShelfieColors.ink, fontFamily: 'DMSans', fontSize: 15, height: 52, marginTop: 8, paddingHorizontal: 14 }, attachmentNote: { alignItems: 'center', backgroundColor: '#F4F1E8', borderRadius: 14, flexDirection: 'row', gap: 12, marginTop: 22, padding: 14 }, attachmentCopy: { flex: 1 },
+  spineBook: { alignItems: 'center', borderRadius: 5, height: 116, justifyContent: 'center', overflow: 'hidden', width: 56 }, compactSpineBook: { height: 70, width: 52 }, spineText: { color: 'rgba(255,255,255,0.78)', maxHeight: 104, transform: [{ rotate: '180deg' }] }, outcomeIcon: { alignItems: 'center', borderRadius: 18, height: 56, justifyContent: 'center', width: 56 }, outcomeTitle: { marginTop: 20, maxWidth: 310 }, outcomeCopy: { marginTop: 9 }, tryCard: { marginTop: 24 }, tryTip: { marginTop: 11 }, retainedCard: { alignItems: 'center', flexDirection: 'row', gap: 13, marginTop: 18 }, retainedCopy: { flex: 1 }, confidenceDivider: { backgroundColor: '#F0EADE', height: 1, marginVertical: 16 }, confidenceRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, confidenceBadges: { alignItems: 'center', flexDirection: 'row', gap: 9 }, confidenceValue: { color: ShelfieColors.review }, confidenceMeter: { backgroundColor: '#F1ECE1', borderRadius: ShelfieRadius.full, height: 6, marginTop: 11, overflow: 'hidden' }, confidenceFill: { backgroundColor: ShelfieColors.reviewAccent, borderRadius: ShelfieRadius.full, height: '100%' }, reviewActionRow: { flexDirection: 'row', gap: 9 }, reviewCorrectButton: { flex: 1 }, reviewDiscardButton: { width: 112 }, reviewFooterNote: { marginTop: 10, textAlign: 'center' }, resultsCount: { marginTop: 18 },
 });

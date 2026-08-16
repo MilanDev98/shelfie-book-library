@@ -1,32 +1,31 @@
-import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import { useColorScheme } from 'react-native';
+import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
+import { View } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { ShelfieTabBar, ShelfieTabButton } from '@/components/shelfie';
 
 export default function AppTabs() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
-
   return (
-    <NativeTabs
-      backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
-      <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="explore">
-        <NativeTabs.Trigger.Label>Explore</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <Tabs>
+      <TabSlot style={{ height: '100%' }} />
+      <TabList asChild>
+        <ShelfieTabBar>
+          <TabTrigger name="index" href="/" asChild>
+            <ShelfieTabButton
+              icon={{ ios: 'camera', android: 'photo_camera', web: 'camera' }}>
+              Scan
+            </ShelfieTabButton>
+          </TabTrigger>
+          <TabTrigger name="explore" href="/explore" asChild>
+            <ShelfieTabButton
+              icon={{ ios: 'books.vertical', android: 'menu_book', web: 'menu_book' }}>
+              Library
+            </ShelfieTabButton>
+          </TabTrigger>
+          <TabTrigger name="book" href="/book/1984" asChild>
+            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ display: 'none' }} />
+          </TabTrigger>
+        </ShelfieTabBar>
+      </TabList>
+    </Tabs>
   );
 }

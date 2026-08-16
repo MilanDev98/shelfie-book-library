@@ -58,7 +58,7 @@ export function AnimatedIcon() {
   return (
     <View style={styles.iconContainer}>
       <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
-        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
+        <View style={[styles.glow, styles.glowBackground]} />
       </Animated.View>
 
       <Animated.View style={styles.background} entering={keyframe.duration(DURATION)}>
@@ -66,7 +66,7 @@ export function AnimatedIcon() {
       </Animated.View>
 
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image style={styles.image} source={require('@/assets/images/shelfie-icon.png')} />
       </Animated.View>
     </View>
   );
@@ -89,6 +89,11 @@ const styles = StyleSheet.create({
     height: 201,
     position: 'absolute',
   },
+  glowBackground: {
+    backgroundColor: '#D79A2B',
+    borderRadius: 100,
+    opacity: 0.2,
+  },
   iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -98,7 +103,7 @@ const styles = StyleSheet.create({
   image: {
     position: 'absolute',
     width: 76,
-    height: 71,
+    height: 76,
   },
   background: {
     width: 128,

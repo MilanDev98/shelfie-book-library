@@ -1,180 +1,35 @@
-import { Image } from 'expo-image';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { EmptyState, ShelfieCard, ShelfieText, setShelfieTabBarVisible } from '@/components/shelfie';
+import { ShelfieColors, ShelfieRadius } from '@/constants/theme';
+import { libraryBooks } from '@/data/library';
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
+function DeviceChrome() {
+  return <View style={styles.deviceStatusBar}><ShelfieText variant="label" style={styles.statusTime}>9:41</ShelfieText><View style={styles.dynamicIsland} /><View style={styles.statusIndicators}><View style={styles.signalBars}>{[5, 8, 11, 13].map((height) => <View key={height} style={[styles.signalBar, { height }]} />)}</View><View style={styles.battery}><View style={styles.batteryFill} /></View></View></View>;
+}
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+function SpineThumb({ title, color }: { title: string; color: string }) {
+  return <View style={[styles.spineThumb, { backgroundColor: color }]}><ShelfieText variant="badge" style={styles.spineText}>{title}</ShelfieText></View>;
+}
 
-  return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+export default function LibraryScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ variant?: string }>();
+  const [empty, setEmpty] = useState(params.variant === 'empty');
+  const [query, setQuery] = useState('');
+  const visibleBooks = libraryBooks.filter((book) => `${book.title} ${book.author}`.toLowerCase().includes(query.toLowerCase()));
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
+  useEffect(() => { setShelfieTabBarVisible(true); }, []);
 
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
-
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
-  );
+  return <View style={styles.screen}><StatusBar style="dark" /><DeviceChrome /><SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}><View style={styles.flex}><View style={styles.top}><View style={styles.titleRow}><ShelfieText variant="display">My Library</ShelfieText><ShelfieText variant="caption" color="quiet">{empty ? '0 books' : '5 books'}</ShelfieText></View>{!empty ? <View style={styles.searchBox}><SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} size={18} tintColor={ShelfieColors.quiet} weight="regular" /><TextInput accessibilityLabel="Search your library" value={query} onChangeText={setQuery} placeholder="Search your library" placeholderTextColor={ShelfieColors.quiet} style={styles.searchInput} /></View> : null}</View><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>{empty ? <EmptyState title="Your library is empty" description="Scan a bookshelf to add your first books." icon={<SymbolView name={{ ios: 'books.vertical', android: 'menu_book', web: 'menu_book' }} size={28} tintColor={ShelfieColors.quiet} weight="regular" />} actionLabel="Scan Bookshelf" onAction={() => router.push('/')} style={styles.emptyState} titleVariant="display" descriptionVariant="body" /> : visibleBooks.map((book, index) => <Pressable key={book.id} accessibilityLabel={`Open details for ${book.title}`} accessibilityRole="button" onPress={() => router.push({ pathname: '/book/[id]', params: { id: book.id } })} style={({ pressed }) => [styles.bookPressable, pressed && styles.bookPressed]}><ShelfieCard style={styles.bookRow}><SpineThumb title={book.title} color={book.spineColor} /><View style={styles.bookCopy}><ShelfieText variant="bodyStrong" numberOfLines={1}>{book.title}</ShelfieText><ShelfieText variant="caption" color="muted">{book.author}</ShelfieText></View>{index === 0 ? <View style={styles.newBadge}><ShelfieText variant="badge" style={styles.newText}>NEW</ShelfieText></View> : null}</ShelfieCard></Pressable>)}{!empty && visibleBooks.length === 0 ? <ShelfieText variant="body" color="muted" style={styles.noResults}>No books match that search.</ShelfieText> : null}</ScrollView><View style={styles.previewToggle}><Pressable onPress={() => setEmpty((value) => !value)}><ShelfieText variant="caption" style={styles.previewToggleText}>{empty ? 'Preview populated library' : 'Preview empty library'}</ShelfieText></Pressable></View></View></SafeAreaView></View>;
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-  },
-  titleContainer: {
-    gap: Spacing.three,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
-  },
-  centerText: {
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
-  },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
-  },
+  screen: { backgroundColor: ShelfieColors.paper, flex: 1 }, safeArea: { alignItems: 'center', flex: 1, width: '100%' }, flex: { flex: 1, maxWidth: 520, width: '100%' }, deviceStatusBar: { alignItems: 'center', flexDirection: 'row', height: 52, justifyContent: 'space-between', paddingHorizontal: 26, position: 'relative', width: '100%' }, statusTime: { color: ShelfieColors.ink, fontSize: 15, fontWeight: '600', lineHeight: 15 }, dynamicIsland: { backgroundColor: '#12100E', borderRadius: ShelfieRadius.full, height: 28, left: '50%', position: 'absolute', top: 11, transform: [{ translateX: -52 }], width: 104 }, statusIndicators: { alignItems: 'flex-end', flexDirection: 'row', gap: 6 }, signalBars: { alignItems: 'flex-end', flexDirection: 'row', gap: 2 }, signalBar: { backgroundColor: ShelfieColors.ink, borderRadius: 1, width: 3 }, battery: { borderColor: ShelfieColors.ink, borderRadius: 4, borderWidth: 1.5, height: 12, padding: 1.5, width: 24 }, batteryFill: { backgroundColor: ShelfieColors.ink, borderRadius: 2, height: '100%', width: '70%' },
+  top: { paddingHorizontal: 20, paddingTop: 6 }, titleRow: { alignItems: 'baseline', flexDirection: 'row', gap: 10 }, searchBox: { alignItems: 'center', backgroundColor: ShelfieColors.surface, borderColor: ShelfieColors.border, borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 10, height: 48, marginTop: 14, paddingHorizontal: 14 }, searchInput: { color: ShelfieColors.ink, flex: 1, fontFamily: 'DMSans', fontSize: 15 }, content: { alignSelf: 'center', paddingBottom: 26, paddingHorizontal: 20, paddingTop: 16, width: '100%' }, bookPressable: { borderRadius: ShelfieRadius.lg, marginBottom: 8 }, bookPressed: { opacity: 0.78 }, bookRow: { alignItems: 'center', flexDirection: 'row', gap: 13, marginBottom: 0, padding: 11 }, spineThumb: { alignItems: 'center', borderRadius: 5, height: 48, justifyContent: 'center', overflow: 'hidden', width: 34 }, spineText: { color: 'rgba(255,255,255,0.82)', maxHeight: 42, transform: [{ rotate: '180deg' }] }, bookCopy: { flex: 1, minWidth: 0 }, newBadge: { backgroundColor: ShelfieColors.matchedTint, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 5 }, newText: { color: ShelfieColors.matched }, emptyState: { marginTop: 68 }, noResults: { paddingTop: 40, textAlign: 'center' }, previewToggle: { alignItems: 'center', paddingBottom: 112, paddingTop: 4 }, previewToggleText: { color: ShelfieColors.primary, textDecorationLine: 'underline' },
 });
