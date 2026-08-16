@@ -214,4 +214,4 @@ export const ShelfieMotion = {
 
 export const ShelfieBottomBarHeight = 104;
 
-export type ShelfieBookStatus = 'matched' | 'review' | 'unreadable' | 'no-match';
+export type ShelfieBookStatus = 'matched' | 'saved' | 'review' | 'unreadable' | 'no-match';

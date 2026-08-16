@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ShelfieColors, ShelfieRadius } from '@/constants/theme';
 
+import { getBookInitial } from './book-initial';
 import { ShelfieText } from './text';
 
 const spines = [
@@ -34,7 +35,7 @@ export function MockShelfPhoto({ compact = false, muted = false }: MockShelfPhot
               { backgroundColor: color, height: `${height * 100}%` },
               muted && styles.muted,
             ]}>
-            {!compact ? <ShelfieText variant="badge" style={styles.spineLabel}>{label}</ShelfieText> : null}
+            {!compact ? <ShelfieText variant="badge" style={styles.spineLabel}>{getBookInitial(label)}</ShelfieText> : null}
           </View>
         ))}
       </View>
@@ -80,11 +81,9 @@ const styles = StyleSheet.create({
   muted: { opacity: 0.55 },
   spineLabel: {
     color: 'rgba(255,255,255,0.68)',
-    fontSize: 6,
-    lineHeight: 7,
-    maxHeight: '90%',
+    fontSize: 12,
+    lineHeight: 14,
     textAlign: 'center',
-    transform: [{ rotate: '180deg' }],
   },
   shelf: {
     backgroundColor: '#3A322B',

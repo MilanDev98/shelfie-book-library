@@ -4,8 +4,8 @@ from time import perf_counter
 from typing import Any
 
 from django.conf import settings
-from PIL import Image
 
+from spine_detection.images import open_upright_rgb_image
 from spine_detection.postprocessing import select_detections
 from spine_detection.types import (
     DetectionBox,
@@ -78,8 +78,7 @@ class OwlV2Detector:
             import torch
 
             processor, model, load_ms = self._ensure_loaded()
-            with Image.open(image_path) as source:
-                image = source.convert("RGB")
+            image = open_upright_rgb_image(image_path)
             image_width, image_height = image.size
 
             preprocess_started = perf_counter()

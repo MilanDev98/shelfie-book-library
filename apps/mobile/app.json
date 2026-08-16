@@ -8,7 +8,14 @@
     "scheme": "shelfie",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/shelfie-icon.png"
+      "bundleIdentifier": "com.milandev98.shelfie",
+      "icon": "./assets/images/shelfie-icon.png",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Shelfie connects to the local development server on your Mac.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,6 +31,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Shelfie to take bookshelf photos.",
+          "photosPermission": "Allow Shelfie to choose bookshelf photos."
+        }
+      ],
       [
         "expo-splash-screen",
         {

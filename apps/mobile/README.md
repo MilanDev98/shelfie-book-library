@@ -1,56 +1,85 @@
 # Shelfie Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+The Expo SDK 57 client for Shelfie. It keeps the approved Scan, Review, and Library screens and connects them to the local Django API.
 
-## Get started
+## Configure the API URL
 
-From the repository root, install dependencies:
-
-   ```bash
-   pnpm install
-   ```
-
-Then start only the mobile workspace:
-
-   ```bash
-   pnpm --filter @shelfie/mobile dev
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-Application routes live in `src/app`. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-The generated example can be reset later with:
+Create the ignored local mobile environment file without overwriting any existing file:
 
 ```bash
-pnpm --filter @shelfie/mobile reset-project
+test -f apps/mobile/.env || cp apps/mobile/.env.example apps/mobile/.env
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+For the web preview or an iOS Simulator using Django on this Mac, either loopback
+or the Mac's LAN address works. Using the LAN address keeps one configuration for
+the simulator and a physical phone:
 
-### Other setup steps
+```dotenv
+EXPO_PUBLIC_API_URL=http://192.168.1.42:8000
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+In development, Shelfie automatically changes that local Django URL to
+`127.0.0.1:8000` inside the iOS Simulator. A physical iPhone keeps the LAN
+address from `.env`.
 
-## Learn more
+Both devices must be on the same Wi-Fi. Find the current LAN address with:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+ipconfig getifaddr en0
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Then set the result in `apps/mobile/.env`, for example:
 
-## Join the community
+```dotenv
+EXPO_PUBLIC_API_URL=http://192.168.1.42:8000
+```
 
-Join our community of developers creating universal apps.
+Also add that same address to `DJANGO_ALLOWED_HOSTS` in the repository-root `.env`, then restart Django. Start Django on the LAN interface:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+uv --project apps/api run python apps/api/manage.py runserver 0.0.0.0:8000
+```
+
+Reload the native app after changing `EXPO_PUBLIC_API_URL`; Expo embeds
+`EXPO_PUBLIC_*` values when it bundles the app. Do not put OpenRouter credentials
+in this file or in any `EXPO_PUBLIC_*` variable. OpenRouter remains server-side
+in Django's ignored root `.env` only.
+
+## Run the client
+
+From the repository root:
+
+```bash
+pnpm install
+pnpm --filter @shelfie/mobile dev
+```
+
+This SDK 57 project uses a Shelfie development build rather than Expo Go. Install
+and launch it on the local iOS Simulator with:
+
+```bash
+pnpm --filter @shelfie/mobile ios -- --device "iPhone 16e"
+```
+
+For a USB-connected iPhone with Developer Mode enabled:
+
+```bash
+pnpm --filter @shelfie/mobile ios:device
+```
+
+The first native run generates the iOS project and takes longer. Later JavaScript
+and TypeScript changes use Fast Refresh through `pnpm --filter @shelfie/mobile dev`.
+
+The app uses Expo Router routes under `src/app`. The Scan flow can take a camera photo or choose an image, upload it as multipart form data to `/api/v1/analyze/read`, map returned matches and candidates into the existing results/review states, and save confirmed catalog IDs through `/api/v1/library/books`. The Library tab loads `/api/v1/library/books` on entry and offers retry UI for API failures.
+
+If the API URL is missing, the app shows a configuration error. Network failures, request timeouts, Django errors, missing catalog setup, and provider failures remain visible in the existing analysis error state; no secret or provider key is sent from the mobile app.
+
+## Useful checks
+
+```bash
+pnpm --filter @shelfie/mobile typecheck
+pnpm --filter @shelfie/mobile lint
+pnpm --filter @shelfie/mobile build
+```
+
+The Django API and catalog setup are documented in the repository-root `README.md`.

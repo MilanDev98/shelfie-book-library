@@ -110,6 +110,23 @@ class AnalyzeShelfApiTests(SimpleTestCase):
         self.assertEqual(detector.prompt, "upright book")
         self.assertEqual(detector.threshold, 0.45)
 
+    def test_accepts_a_valid_webp_upload(self) -> None:
+        detector = FakeDetector()
+        with patch("spine_detection.services.get_detector", return_value=detector):
+            response = self.client.post(
+                self.endpoint,
+                {
+                    "image": image_upload(
+                        name="shelf.webp",
+                        image_format="WEBP",
+                        content_type="image/webp",
+                    )
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "completed")
+
     def test_rejects_a_missing_image(self) -> None:
         response = self.client.post(self.endpoint, {})
 

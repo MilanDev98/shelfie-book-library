@@ -15,6 +15,7 @@ import {
 } from '@/constants/theme';
 
 import { ConfidenceBadge, StatusBadge } from './badge';
+import { getBookInitial } from './book-initial';
 import { ShelfieCard } from './card';
 import { ShelfieText } from './text';
 
@@ -42,7 +43,7 @@ function ReviewContent({ book, showDetectedText = false }: ReviewContentProps) {
     <>
       <View style={styles.spine}>
         <ShelfieText variant="badge" style={styles.spineLabel}>
-          {title}
+          {getBookInitial(book.title || book.detectedTitle)}
         </ShelfieText>
       </View>
       <View style={styles.copy}>
@@ -140,9 +141,9 @@ const styles = StyleSheet.create({
   },
   spineLabel: {
     color: 'rgba(251, 249, 244, 0.82)',
-    maxHeight: 40,
-    transform: [{ rotate: '180deg' }],
-    writingDirection: 'ltr',
+    fontSize: 20,
+    lineHeight: 24,
+    textAlign: 'center',
   },
   copy: {
     flex: 1,

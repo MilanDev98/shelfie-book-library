@@ -32,7 +32,7 @@ export function ShelfieProcessingState({
     <ShelfieCard accessibilityRole="progressbar" style={style}>
       <View style={styles.heading}>
         <View style={styles.spinner}>
-          <ActivityIndicator color={ShelfieColors.primary} />
+          <ActivityIndicator color={ShelfieColors.primary} size="large" />
         </View>
         <View style={styles.headingCopy}>
           <ShelfieText variant="title">{title}</ShelfieText>

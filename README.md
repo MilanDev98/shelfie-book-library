@@ -3,15 +3,14 @@
 Shelfie turns a bookshelf photo into a structured personal library. The project uses one
 Turborepo containing an Expo mobile app and a Django REST API.
 
-This repository currently contains the project foundation, deterministic catalog matching,
-read-only catalog APIs, and a local CPU OWLv2 book-spine detector API. Hosted title/author
-extraction, review, and personal-library features have not been implemented yet.
+This repository contains the project foundation, deterministic catalog matching, a local CPU
+OWLv2 book-spine detector, hosted title/author extraction through a Django-only OpenRouter
+integration, and the Expo client connection for scan, review, and saved-library flows.
 
 ## Prepare OpenRouter configuration
 
-OpenRouter will be used in a later phase to read a possible title and author from each individual
-book-spine crop. The provider integration is not implemented yet, so completing this configuration
-does not make an external AI call.
+OpenRouter reads a possible title and author from each individual book-spine crop. The mobile app
+uploads photos only to Django; it never receives or sends the OpenRouter credential.
 
 Create the ignored local environment file during first-time setup, then edit only your local
 `.env` file and set these exact variables:
