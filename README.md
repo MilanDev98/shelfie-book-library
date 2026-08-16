@@ -198,16 +198,21 @@ result is visible in the Expo UI with guidance to scan one shelf at a time.
 
 Measurements below were taken on the development Mac with cached OWLv2 weights, Django's local
 development server, threshold `0.3`, and the committed files in `test_photos/`. They are one-run
-engineering measurements, not benchmark claims.
+engineering measurements, not benchmark claims. The full-pipeline measurement used an authorized,
+billable OpenRouter request to `google/gemini-2.5-flash`.
 
-| Image | Result | Cached CPU inference | Django processing | HTTP elapsed |
+| Image and path | Result | CPU inference | Django total | HTTP elapsed |
 | --- | ---: | ---: | ---: | ---: |
-| `bookshelf-sample.webp` (3627 x 2720) | 12 detections, truncated | 3101.74 ms | 3815.81 ms | 3.97 s |
+| `bookshelf-sample.webp` (3627 x 2720), local detection | 12 detections, truncated | 3101.74 ms | 3815.81 ms | 3.97 s |
+| `bookshelf-sample.webp` (3627 x 2720), full hosted pipeline | 12 detections and 12 structured readings, truncated | 3613.83 ms | 11812.91 ms | 12.16 s |
 | `no-books-control.jpg` (640 x 480) | 0 detections | included in total | no provider call | 2.52 s |
 
-The zero-book path intentionally skips OpenRouter. A real billable OpenRouter request was not made
-for this repository snapshot, so hosted latency is explicitly still to be measured with the final
-spend-capped key before submission.
+The full run included a 3024.81 ms cold model load. Local model-load, preprocessing, inference, and
+postprocessing timings totaled 7613.17 ms; crop creation plus the OpenRouter round trip accounted
+for the remaining approximately 4199.74 ms. Gemini returned all 12 spine identifiers as readable.
+Catalog matching classified one as `not_sure` and eleven as `not_found`, so every result reached the
+human review path rather than being silently accepted or dropped. The zero-book path intentionally
+skips OpenRouter.
 
 Cost estimate for the worst-case 12-crop request:
 
@@ -217,8 +222,8 @@ Cost estimate for the worst-case 12-crop request:
 - OpenRouter currently lists `google/gemini-2.5-flash` at $0.30 per million input tokens and $2.50
   per million output tokens.
 - Estimated image-input cost: **$0.00093-$0.00186 per shelf image**.
-- Allowing up to 500 output tokens for compact JSON adds at most **$0.00125**.
-- Estimated worst-case model total: **$0.00218-$0.00311 per shelf image** (roughly 0.22-0.31 cents),
+- Allowing up to 1,000 output tokens for compact structured JSON adds at most **$0.00250**.
+- Estimated worst-case model total: **$0.00343-$0.00436 per shelf image** (roughly 0.34-0.44 cents),
   before any credit-purchase fee.
 
 Pricing and token rules change; verify the
@@ -281,11 +286,6 @@ zero-detection routing, timeouts, and malformed responses.
   original crop for saved books.
 
 ## Unfinished and another day
-
-Before sending the repository link, run one authorized end-to-end request with the spend-capped
-OpenRouter key and record actual provider/full-pipeline latency, returned titles, token usage, and
-billed cost. This snapshot includes the complete provider integration and mocked failure tests but
-does not claim a billable external call that was not made.
 
 With another day I would add a small recorded native E2E suite, batch/retry hosted crops separately
 so one provider failure does not repeat local inference, retain short-lived crop IDs for richer

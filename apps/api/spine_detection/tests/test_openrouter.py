@@ -105,7 +105,14 @@ class SpineReadingParsingTests(SimpleTestCase):
         sent_request = request.call_args.args[0]
         sent_body = json.loads(sent_request.data.decode("utf-8"))
         self.assertEqual(sent_body["model"], "test/model")
-        self.assertEqual(sent_body["max_tokens"], 500)
+        self.assertEqual(sent_body["max_tokens"], 1000)
+        self.assertEqual(sent_body["response_format"]["type"], "json_schema")
+        response_schema = sent_body["response_format"]["json_schema"]
+        self.assertTrue(response_schema["strict"])
+        self.assertEqual(
+            response_schema["schema"]["properties"]["books"]["items"]["required"],
+            ["id", "title", "author", "readable"],
+        )
         image_parts = [
             part
             for part in sent_body["messages"][0]["content"]

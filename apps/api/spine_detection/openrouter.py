@@ -123,11 +123,39 @@ def read_spines(crops: list[tuple[int, bytes]]) -> list[SpineReading]:
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded}"}},
         ])
 
+    response_schema = {
+        "type": "object",
+        "properties": {
+            "books": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "title": {"type": ["string", "null"]},
+                        "author": {"type": ["string", "null"]},
+                        "readable": {"type": "boolean"},
+                    },
+                    "required": ["id", "title", "author", "readable"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["books"],
+        "additionalProperties": False,
+    }
     body = json.dumps({
         "model": settings.OPENROUTER_VISION_MODEL,
         "messages": [{"role": "user", "content": content}],
-        "response_format": {"type": "json_object"},
-        "max_tokens": 500,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "book_spine_readings",
+                "strict": True,
+                "schema": response_schema,
+            },
+        },
+        "max_tokens": 1000,
         "temperature": 0,
     }).encode("utf-8")
     request = Request(
