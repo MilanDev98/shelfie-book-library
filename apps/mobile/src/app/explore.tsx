@@ -2,7 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState, ShelfieCard, ShelfieText, setShelfieTabBarVisible } from '@/components/shelfie';
@@ -11,6 +11,7 @@ import { ShelfieColors, ShelfieRadius } from '@/constants/theme';
 import { getSavedLibrary, type SavedLibraryBook } from '@/lib/shelfie-api';
 
 function DeviceChrome() {
+  if (Platform.OS !== 'web') return null;
   return <View style={styles.deviceStatusBar}><ShelfieText variant="label" style={styles.statusTime}>9:41</ShelfieText><View style={styles.dynamicIsland} /><View style={styles.statusIndicators}><View style={styles.signalBars}>{[5, 8, 11, 13].map((height) => <View key={height} style={[styles.signalBar, { height }]} />)}</View><View style={styles.battery}><View style={styles.batteryFill} /></View></View></View>;
 }
 

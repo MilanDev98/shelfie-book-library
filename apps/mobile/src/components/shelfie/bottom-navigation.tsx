@@ -37,13 +37,13 @@ export function ShelfieTabButton({ children, icon, isFocused, ...props }: Shelfi
   );
 }
 
-export function ShelfieTabBar({ style, ...props }: TabListProps) {
+export function ShelfieTabBar({ routeHidden = false, style, ...props }: TabListProps & { routeHidden?: boolean }) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => subscribeToShelfieTabBar(setVisible), []);
 
   return (
-    <View {...props} style={[style, styles.container, !visible && styles.hidden]}>
+    <View {...props} style={[style, styles.container, (routeHidden || !visible) && styles.hidden]}>
       <View style={styles.tabRow}>{props.children}</View>
       <View style={styles.homeIndicatorArea}>
         <View style={styles.homeIndicator} />

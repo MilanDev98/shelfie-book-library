@@ -1,15 +1,16 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
-import { useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ShelfieButton, ShelfieCard, ShelfieText, StatusBadge, setShelfieTabBarVisible } from '@/components/shelfie';
 import { ShelfieColors, ShelfieRadius, ShelfieSpacing } from '@/constants/theme';
-import { libraryBooks } from '@/data/library';
+import { getCatalogBook, type CatalogBookDetail } from '@/lib/shelfie-api';
 
 function DeviceChrome() {
+  if (Platform.OS !== 'web') return null;
   return <View style={styles.deviceStatusBar}><ShelfieText variant="label" style={styles.statusTime}>9:41</ShelfieText><View style={styles.dynamicIsland} /><View style={styles.statusIndicators}><View style={styles.signalBars}>{[5, 8, 11, 13].map((height) => <View key={height} style={[styles.signalBar, { height }]} />)}</View><View style={styles.battery}><View style={styles.batteryFill} /></View></View></View>;
 }
 
@@ -25,23 +26,41 @@ export default function BookDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const bookId = Array.isArray(params.id) ? params.id[0] : params.id;
-  const book = libraryBooks.find((item) => item.id === bookId) ?? libraryBooks[0];
+  const [book, setBook] = useState<CatalogBookDetail | null>(null);
+  const [loading, setLoading] = useState(Boolean(bookId));
+  const [error, setError] = useState<string | null>(bookId ? null : 'This book link is missing a catalog ID.');
 
   useEffect(() => {
     setShelfieTabBarVisible(false);
     return () => setShelfieTabBarVisible(true);
   }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!bookId) {
+      return () => controller.abort();
+    }
+    void getCatalogBook(bookId, controller.signal).then(setBook).catch((caught) => {
+      if (!controller.signal.aborted) {
+        setError(caught instanceof Error ? caught.message : 'Could not load this book.');
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
+  }, [bookId]);
 
   const goToLibrary = () => {
     setShelfieTabBarVisible(true);
-    router.replace('/explore?variant=populated');
+    router.replace('/explore');
   };
   const goToScan = () => {
     setShelfieTabBarVisible(true);
     router.push('/');
   };
 
-  return <View style={styles.screen}><StatusBar style="dark" /><DeviceChrome /><SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}><View style={styles.flex}><View style={styles.header}><Pressable accessibilityLabel="Back to library" accessibilityRole="button" onPress={goToLibrary} style={styles.backButton}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={19} tintColor={ShelfieColors.primary} weight="regular" /></Pressable><ShelfieText variant="title" style={styles.headerTitle}>Book Details</ShelfieText><View style={styles.headerSpacer} /></View><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.coverWrap}><BookCover title={book.title} author={book.author} color={book.spineColor} /></View><View style={styles.titleBlock}><ShelfieText variant="display" style={styles.bookTitle}>{book.title}</ShelfieText><ShelfieText variant="body" color="muted" style={styles.author}>{book.author}</ShelfieText><View style={styles.statusRow}><StatusBadge status="matched" label="In your library" /><ShelfieText variant="caption" color="quiet">Added from bookshelf scan</ShelfieText></View></View><ShelfieCard style={styles.infoCard}><ShelfieText variant="badge" color="quiet" style={styles.sectionLabel}>CATALOG INFORMATION</ShelfieText><View style={styles.infoGrid}><InfoItem label="EDITION" value={book.edition} /><InfoItem label="FORMAT" value={book.format} /><InfoItem label="PUBLISHED" value={book.published} /><InfoItem label="LENGTH" value={book.pages} /></View><View style={styles.isbnRow}><ShelfieText variant="badge" color="quiet">ISBN</ShelfieText><ShelfieText variant="caption" color="muted">{book.isbn}</ShelfieText></View></ShelfieCard><View style={styles.aboutSection}><ShelfieText variant="badge" color="quiet" style={styles.sectionLabel}>ABOUT THIS BOOK</ShelfieText><ShelfieText variant="body" color="muted">{book.description}</ShelfieText><View style={styles.genrePill}><ShelfieText variant="caption" style={styles.genreText}>{book.genre}</ShelfieText></View></View></ScrollView><View style={styles.footer}><ShelfieButton size="lg" onPress={goToScan}>Scan Another Book</ShelfieButton><ShelfieButton size="md" variant="secondary" onPress={goToLibrary}>Back to Library</ShelfieButton></View></View></SafeAreaView></View>;
+  const color = bookId && bookId.charCodeAt(bookId.length - 1) % 2 === 0 ? '#2F5E58' : '#7E4A3A';
+
+  return <View style={styles.screen}><StatusBar style="dark" /><DeviceChrome /><SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}><View style={styles.flex}><View style={styles.header}><Pressable accessibilityLabel="Back to library" accessibilityRole="button" onPress={goToLibrary} style={styles.backButton}><SymbolView name={{ ios: 'chevron.left', android: 'chevron_left', web: 'chevron_left' }} size={19} tintColor={ShelfieColors.primary} weight="regular" /></Pressable><ShelfieText variant="title" style={styles.headerTitle}>Book Details</ShelfieText><View style={styles.headerSpacer} /></View>{loading ? <View accessibilityLiveRegion="polite" style={styles.loadingState}><ActivityIndicator color={ShelfieColors.primary} size="large" /><ShelfieText variant="body" color="muted">Loading catalog details…</ShelfieText></View> : error || !book ? <View style={styles.errorState}><ShelfieText variant="title">Could not load this book</ShelfieText><ShelfieText variant="body" color="muted" style={styles.errorCopy}>{error ?? 'The catalog entry is unavailable.'}</ShelfieText><ShelfieButton size="md" variant="secondary" onPress={goToLibrary}>Back to Library</ShelfieButton></View> : <><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}><View style={styles.coverWrap}><BookCover title={book.title} author={book.author} color={color} /></View><View style={styles.titleBlock}><ShelfieText variant="display" style={styles.bookTitle}>{book.title}</ShelfieText><ShelfieText variant="body" color="muted" style={styles.author}>{book.author}</ShelfieText><View style={styles.statusRow}><StatusBadge status="matched" label="In your library" /><ShelfieText variant="caption" color="quiet">Catalog ID {book.catalog_id}</ShelfieText></View></View><ShelfieCard style={styles.infoCard}><ShelfieText variant="badge" color="quiet" style={styles.sectionLabel}>CATALOG INFORMATION</ShelfieText><View style={styles.infoGrid}><InfoItem label="EDITION" value={book.edition || 'Not specified'} /><InfoItem label="CATALOG ID" value={book.catalog_id} /></View>{book.alternate_titles.length > 0 ? <View style={styles.metadataRow}><ShelfieText variant="badge" color="quiet">ALTERNATE TITLES</ShelfieText><ShelfieText variant="caption" color="muted" style={styles.metadataValue}>{book.alternate_titles.join(' · ')}</ShelfieText></View> : null}{book.author_aliases.length > 0 ? <View style={styles.metadataRow}><ShelfieText variant="badge" color="quiet">AUTHOR ALIASES</ShelfieText><ShelfieText variant="caption" color="muted" style={styles.metadataValue}>{book.author_aliases.join(' · ')}</ShelfieText></View> : null}{book.contained_titles.length > 0 ? <View style={styles.metadataRow}><ShelfieText variant="badge" color="quiet">CONTAINS</ShelfieText><ShelfieText variant="caption" color="muted" style={styles.metadataValue}>{book.contained_titles.join(' · ')}</ShelfieText></View> : null}</ShelfieCard></ScrollView><View style={styles.footer}><ShelfieButton size="lg" onPress={goToScan}>Scan Another Shelf</ShelfieButton><ShelfieButton size="md" variant="secondary" onPress={goToLibrary}>Back to Library</ShelfieButton></View></>}</View></SafeAreaView></View>;
 }
 
 const styles = StyleSheet.create({
@@ -77,6 +96,11 @@ const styles = StyleSheet.create({
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: ShelfieSpacing.md, marginTop: ShelfieSpacing.md },
   infoItem: { minWidth: '44%', flex: 1 },
   infoValue: { marginTop: ShelfieSpacing.xxs },
+  metadataRow: { borderTopColor: ShelfieColors.divider, borderTopWidth: 1, gap: ShelfieSpacing.xxs, marginTop: ShelfieSpacing.lg, paddingTop: ShelfieSpacing.md },
+  metadataValue: { lineHeight: 20 },
+  loadingState: { alignItems: 'center', flex: 1, gap: ShelfieSpacing.sm, justifyContent: 'center' },
+  errorState: { alignItems: 'center', flex: 1, gap: ShelfieSpacing.md, justifyContent: 'center', paddingHorizontal: ShelfieSpacing.xl },
+  errorCopy: { textAlign: 'center' },
   isbnRow: { borderTopColor: ShelfieColors.divider, borderTopWidth: 1, flexDirection: 'row', gap: ShelfieSpacing.sm, marginTop: ShelfieSpacing.lg, paddingTop: ShelfieSpacing.md },
   aboutSection: { paddingHorizontal: ShelfieSpacing.xs, paddingTop: ShelfieSpacing.xl },
   genrePill: { alignSelf: 'flex-start', backgroundColor: ShelfieColors.surfaceTint, borderRadius: ShelfieRadius.full, marginTop: ShelfieSpacing.md, paddingHorizontal: ShelfieSpacing.sm, paddingVertical: ShelfieSpacing.xxs },

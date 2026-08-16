@@ -52,6 +52,12 @@ export type CatalogCandidate = {
   author_score?: number;
 };
 
+export type CatalogBookDetail = CatalogCandidate & {
+  alternate_titles: string[];
+  author_aliases: string[];
+  contained_titles: string[];
+};
+
 export type CatalogLookupResponse = {
   count: number;
   results: CatalogCandidate[];
@@ -73,8 +79,16 @@ export type AnalyzeReadResponse = {
   status: 'completed';
   model: string;
   vision_model: string;
+  detection_count: number;
+  truncated: boolean;
   books: AnalyzedBook[];
-  timings_ms: { total: number };
+  timings_ms: {
+    model_load: number;
+    preprocess: number;
+    inference: number;
+    postprocess: number;
+    total: number;
+  };
   persisted: false;
 };
 
@@ -172,6 +186,10 @@ export function getSavedLibrary(signal?: AbortSignal): Promise<LibraryListRespon
 export function searchCatalog(query: string): Promise<CatalogLookupResponse> {
   const params = new URLSearchParams({ q: query.trim(), limit: '10' });
   return request<CatalogLookupResponse>(`/api/v1/catalog?${params.toString()}`);
+}
+
+export function getCatalogBook(catalogId: string, signal?: AbortSignal): Promise<CatalogBookDetail> {
+  return request<CatalogBookDetail>(`/api/v1/catalog/${encodeURIComponent(catalogId)}`, { signal });
 }
 
 export function saveConfirmedBooks(catalogIds: string[]): Promise<LibrarySaveResponse> {
