@@ -7,6 +7,6 @@
     "build": "uv --cache-dir ../../.cache/uv run python manage.py check",
     "lint": "uv --cache-dir ../../.cache/uv run ruff check .",
     "test": "uv --cache-dir ../../.cache/uv run python manage.py test",
-    "typecheck": "uv --cache-dir ../../.cache/uv run mypy config"
+    "typecheck": "uv --cache-dir ../../.cache/uv run mypy config catalog_matching"
   }
 }

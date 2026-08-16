@@ -34,6 +34,7 @@ ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split("
 INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
+    "catalog_matching",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

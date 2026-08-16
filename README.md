@@ -3,8 +3,9 @@
 Shelfie turns a bookshelf photo into a structured personal library. The project uses one
 Turborepo containing an Expo mobile app and a Django REST API.
 
-This repository currently contains the basic project setup only. Book detection, AI extraction,
-catalog matching, review, and library features have not been implemented yet.
+This repository currently contains the project foundation, deterministic catalog matching, and
+read-only catalog APIs. Book detection, AI extraction, review, and personal-library features have
+not been implemented yet.
 
 ## Workspace
 
@@ -117,7 +118,21 @@ uv --project apps/api run python apps/api/manage.py migrate
 
 This creates the local SQLite database tables required by Django.
 
-### 8. Start Expo and Django
+### 8. Import the book catalog
+
+```bash
+uv --project apps/api run python apps/api/manage.py import_catalog
+```
+
+This validates the repository-root `catalog.csv` and imports it into SQLite. Runtime matching
+queries SQLite directly; it does not read the CSV. The command is safe to run repeatedly: existing
+rows are updated only when their imported values change, unchanged rows are left alone, and the
+command reports how many rows were created, updated, or unchanged.
+
+Run this command again whenever `catalog.csv` changes. A new clone needs both `migrate` and
+`import_catalog` before catalog matching can run.
+
+### 9. Start Expo and Django
 
 For normal mobile development, use two Terminal tabs. This keeps Expo interactive so its keyboard
 controls work normally.
@@ -162,6 +177,54 @@ Open `http://localhost:8000/api/v1/health`. It should return:
 {"status":"ok"}
 ```
 
+The catalog must be migrated and imported before using the match endpoint. Follow first-time steps
+7 and 8 above, then start Django.
+
+### Match a title and author
+
+Send JSON to `POST /api/v1/catalog/match`:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/catalog/match \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Dune","author":"Frank Herbert"}'
+```
+
+`title` is required and `author` is optional. A valid request returns HTTP 200 with one of these
+statuses:
+
+- `matched`: one confident catalog book is returned in `match`.
+- `not_sure`: up to three safe candidate summaries are returned for human review.
+- `not_found`: no reasonable catalog candidate was found.
+
+Missing or invalid fields return HTTP 400 with field-specific validation messages. If the catalog
+has not been imported, the endpoint returns HTTP 503 with the `catalog_not_initialized` error code.
+The endpoint only matches supplied text; it does not accept or process photos.
+
+### List or search the catalog
+
+Use `GET /api/v1/catalog` to inspect catalog summaries. The optional `q` parameter searches IDs,
+titles, authors, title aliases, author aliases, and editions. `limit` defaults to 10 and accepts
+values from 1 through 50.
+
+```bash
+curl "http://localhost:8000/api/v1/catalog?q=Dune&limit=5"
+```
+
+The response contains the total matching `count` and a limited `results` list. Results expose only
+catalog ID, title, author, and edition.
+
+### Get one catalog book
+
+Use `GET /api/v1/catalog/{catalog_id}` to retrieve one book's complete public catalog fields,
+including alternate titles, author aliases, and contained titles.
+
+```bash
+curl http://localhost:8000/api/v1/catalog/B081
+```
+
+An unknown catalog ID returns HTTP 404 with the `catalog_book_not_found` error code.
+
 For a physical iPhone, change `EXPO_PUBLIC_API_URL` to the development Mac's LAN address, such as
 `http://192.168.x.x:8000`, and keep the phone and Mac on the same network.
 
@@ -201,7 +264,8 @@ the repository root:
 
 Run `pnpm install` again after JavaScript dependencies change. Run
 `uv sync --project apps/api --all-groups` after Python dependencies change. Run Django migrations
-again after new database migrations are added.
+again after new database migrations are added. Run
+`uv --project apps/api run python apps/api/manage.py import_catalog` after catalog CSV changes.
 
 ## Common development-server problems
 
@@ -263,15 +327,13 @@ git status
 Normal implementation work and setup improvements are committed on `develop`. Do not commit
 `.env`, SQLite databases, virtual environments, `node_modules`, Expo build output, or caches.
 
-## Next development phase
+## Catalog data flow
 
-The basic Turborepo, Expo, and Django foundation is complete. The next planned phase is the catalog
-and deterministic matching system:
+`catalog.csv` is the version-controlled source used to seed the canonical catalog. The
+`import_catalog` command validates and copies those records into the `CatalogBook` SQLite table.
+The deterministic matcher queries that table and returns `matched`, `not_sure`, or `not_found`.
+Ambiguous editions, same-title books, omnibus relationships, aliases, and missing-author inputs
+remain review cases instead of being silently accepted.
 
-1. Add the intentionally messy catalog with at least 120 books.
-2. Implement title and author normalization.
-3. Implement confidence scoring and candidate ranking.
-4. Add matcher tests for ambiguity, aliases, editions, omnibuses, and missing authors.
-
-The API analysis endpoints, mobile capture workflow, local spine detector, hosted VLM, and review
-workflow come after the catalog and matcher foundation. They are not part of the current setup.
+The API analysis endpoints, mobile capture workflow, local spine detector, hosted VLM, review
+workflow, and personal-library persistence are later phases and are not part of this phase.
