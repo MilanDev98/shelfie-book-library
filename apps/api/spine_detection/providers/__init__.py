@@ -1,0 +1,1 @@
+"""Local spine detector providers."""

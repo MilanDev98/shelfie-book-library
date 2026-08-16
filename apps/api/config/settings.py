@@ -13,8 +13,14 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Local development settings live at the repository root. Do not override values
+# supplied by the shell or deployment environment.
+load_dotenv(BASE_DIR.parent.parent / ".env", override=False)
 
 
 # Quick-start development settings - unsuitable for production
@@ -35,6 +41,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "catalog_matching",
+    "spine_detection",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -125,6 +132,37 @@ CORS_ALLOWED_ORIGINS = os.getenv(
     "DJANGO_CORS_ALLOWED_ORIGINS",
     "http://localhost:8081,http://localhost:19006",
 ).split(",")
+
+
+# Hosted vision provider configuration. The provider itself is added in a later phase.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_VISION_MODEL = os.getenv(
+    "OPENROUTER_VISION_MODEL",
+    "google/gemini-2.5-flash",
+)
+
+
+# Local CPU spine detector. API requests use cached files only; warm_detector performs downloads.
+SPINE_DETECTOR_MODEL_ID = os.getenv(
+    "SPINE_DETECTOR_MODEL_ID",
+    "google/owlv2-base-patch16-ensemble",
+)
+_detector_cache_dir = Path(os.getenv("SPINE_DETECTOR_CACHE_DIR", ".cache/huggingface"))
+SPINE_DETECTOR_CACHE_DIR = (
+    _detector_cache_dir
+    if _detector_cache_dir.is_absolute()
+    else BASE_DIR.parent.parent / _detector_cache_dir
+)
+SPINE_DETECTOR_DEFAULT_PROMPT = os.getenv("SPINE_DETECTOR_DEFAULT_PROMPT", "book spine")
+SPINE_DETECTOR_DEFAULT_THRESHOLD = float(
+    os.getenv("SPINE_DETECTOR_DEFAULT_THRESHOLD", "0.3")
+)
+SPINE_DETECTOR_NMS_IOU_THRESHOLD = float(
+    os.getenv("SPINE_DETECTOR_NMS_IOU_THRESHOLD", "0.5")
+)
+SPINE_DETECTOR_MAX_DETECTIONS = int(os.getenv("SPINE_DETECTOR_MAX_DETECTIONS", "12"))
+SPINE_IMAGE_MAX_UPLOAD_BYTES = int(os.getenv("SPINE_IMAGE_MAX_UPLOAD_BYTES", "10485760"))
+SPINE_IMAGE_MAX_PIXELS = int(os.getenv("SPINE_IMAGE_MAX_PIXELS", "40000000"))
 
 
 # Email

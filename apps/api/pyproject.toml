@@ -7,6 +7,11 @@ dependencies = [
     "django==6.1",
     "django-cors-headers==4.9.0",
     "djangorestframework==3.18.0",
+    "pillow>=11,<13",
+    "python-dotenv>=1,<2",
+    "scipy>=1.15,<2",
+    "torch>=2.6,<3",
+    "transformers>=4.57,<5",
 ]
 
 [dependency-groups]

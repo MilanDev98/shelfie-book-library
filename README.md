@@ -3,9 +3,43 @@
 Shelfie turns a bookshelf photo into a structured personal library. The project uses one
 Turborepo containing an Expo mobile app and a Django REST API.
 
-This repository currently contains the project foundation, deterministic catalog matching, and
-read-only catalog APIs. Book detection, AI extraction, review, and personal-library features have
-not been implemented yet.
+This repository currently contains the project foundation, deterministic catalog matching,
+read-only catalog APIs, and a local CPU OWLv2 book-spine detector API. Hosted title/author
+extraction, review, and personal-library features have not been implemented yet.
+
+## Prepare OpenRouter configuration
+
+OpenRouter will be used in a later phase to read a possible title and author from each individual
+book-spine crop. The provider integration is not implemented yet, so completing this configuration
+does not make an external AI call.
+
+Create the ignored local environment file during first-time setup, then edit only your local
+`.env` file and set these exact variables:
+
+```dotenv
+OPENROUTER_API_KEY=your-real-openrouter-key
+OPENROUTER_VISION_MODEL=google/gemini-2.5-flash
+```
+
+- `OPENROUTER_API_KEY` is the private server-side credential. Never put it in `.env.example`,
+  source code, screenshots, logs, commits, Expo variables, or any `EXPO_PUBLIC_*` variable.
+- `OPENROUTER_VISION_MODEL` is the selected OpenRouter model ID. Shelfie currently selects
+  `google/gemini-2.5-flash`. Before running the later provider integration, confirm on its current
+  OpenRouter model page that it still supports both image input and structured output/JSON Schema.
+  Model capabilities and pricing can change, so this repository does not assume the selected model
+  is free or permanently compatible.
+- Keep `OPENROUTER_API_KEY` empty in `.env.example`; that file documents variable names and is safe
+  to commit. The selected model ID is safe to include there.
+
+After adding or changing either value, stop Django with `Ctrl+C` and start it again:
+
+```bash
+pnpm --filter @shelfie/api dev
+```
+
+Django reads environment variables when its process starts. A running server will not reliably
+pick up `.env` changes until it is restarted. Do not paste a real API key into chat; add it locally
+yourself.
 
 ## Workspace
 
@@ -132,7 +166,22 @@ command reports how many rows were created, updated, or unchanged.
 Run this command again whenever `catalog.csv` changes. A new clone needs both `migrate` and
 `import_catalog` before catalog matching can run.
 
-### 9. Start Expo and Django
+### 9. Download and warm the local detector
+
+```bash
+uv --project apps/api run python apps/api/manage.py warm_detector
+```
+
+This intentionally downloads `google/owlv2-base-patch16-ensemble` once and verifies that it loads
+on CPU. The current safetensors weights are about 620 MB; the measured local Hugging Face cache is
+about 603 MB. Shelfie stores them under the ignored `.cache/huggingface` directory by default.
+Normal API requests use that local cache and do not download model files.
+
+The first run needs internet access and can take several minutes. Later runs are local. If the
+weights are missing, `POST /api/v1/analyze` returns the `detector_unavailable` error with the
+warm-up instruction instead of starting an unexpected download.
+
+### 10. Start Expo and Django
 
 For normal mobile development, use two Terminal tabs. This keeps Expo interactive so its keyboard
 controls work normally.
@@ -224,6 +273,52 @@ curl http://localhost:8000/api/v1/catalog/B081
 ```
 
 An unknown catalog ID returns HTTP 404 with the `catalog_book_not_found` error code.
+
+### Detect book spines locally
+
+`POST /api/v1/analyze` accepts a multipart shelf image and runs OWLv2 entirely on the Django
+machine's CPU. It does not call hosted AI, read titles, match the catalog, or persist the upload or
+results.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/analyze \
+  -F "image=@/path/to/shelf.jpg;type=image/jpeg" \
+  -F "prompt=book spine" \
+  -F "threshold=0.3"
+```
+
+The default prompt is exactly `book spine`; the default threshold is `0.3`, with accepted request
+values from `0.05` through `0.95`. Supported uploads are JPEG, PNG, and WebP. The API cross-checks
+the image content, MIME type, and filename extension, rejects files over 10 MB or 40 megapixels,
+and removes its temporary copy after inference.
+
+The response contains:
+
+- Model identifier and `cpu` device.
+- Original image dimensions.
+- Numbered boxes in original image coordinates with label and score.
+- The prompt and threshold used.
+- Model-load, preprocessing, inference, postprocessing, and total timing measurements.
+- `truncated`, which is true when detections exceed the configured 12-result cap.
+- `persisted: false`, confirming that this phase stores neither images nor results.
+
+The model is lazy-loaded once per Django process and reused for later requests. A real local test
+on a 3627×2720 WebP returned 12 boxes at threshold `0.3`; the measured cached CPU inference was
+about 3.17 seconds and total request processing was about 3.92 seconds. These numbers are specific
+to the development Mac and test image, not a general performance guarantee.
+
+Detector settings can be overridden through environment variables:
+
+| Variable | Default |
+| --- | --- |
+| `SPINE_DETECTOR_MODEL_ID` | `google/owlv2-base-patch16-ensemble` |
+| `SPINE_DETECTOR_CACHE_DIR` | `.cache/huggingface` |
+| `SPINE_DETECTOR_DEFAULT_PROMPT` | `book spine` |
+| `SPINE_DETECTOR_DEFAULT_THRESHOLD` | `0.3` |
+| `SPINE_DETECTOR_NMS_IOU_THRESHOLD` | `0.5` |
+| `SPINE_DETECTOR_MAX_DETECTIONS` | `12` |
+| `SPINE_IMAGE_MAX_UPLOAD_BYTES` | `10485760` |
+| `SPINE_IMAGE_MAX_PIXELS` | `40000000` |
 
 For a physical iPhone, change `EXPO_PUBLIC_API_URL` to the development Mac's LAN address, such as
 `http://192.168.x.x:8000`, and keep the phone and Mac on the same network.
@@ -335,5 +430,6 @@ The deterministic matcher queries that table and returns `matched`, `not_sure`, 
 Ambiguous editions, same-title books, omnibus relationships, aliases, and missing-author inputs
 remain review cases instead of being silently accepted.
 
-The API analysis endpoints, mobile capture workflow, local spine detector, hosted VLM, review
-workflow, and personal-library persistence are later phases and are not part of this phase.
+The local detector is deliberately separate from language AI: OWLv2 only returns candidate book
+spine regions. A later hosted VLM phase will read possible titles and authors from those crops.
+Mobile capture, hosted extraction, review, and personal-library persistence remain later phases.
