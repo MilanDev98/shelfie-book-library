@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "catalog_matching",
+    "library",
     "spine_detection",
     'django.contrib.admin',
     'django.contrib.auth',

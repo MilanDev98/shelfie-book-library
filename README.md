@@ -274,6 +274,41 @@ curl http://localhost:8000/api/v1/catalog/B081
 
 An unknown catalog ID returns HTTP 404 with the `catalog_book_not_found` error code.
 
+### Save confirmed books to the library
+
+The saved-library API stores confirmed catalog books. The catalog must be migrated and imported
+before saving books. Saving is idempotent: a catalog book can be saved only once in the current
+single-library implementation, and repeated requests report it under `already_saved`.
+
+Save one or more confirmed catalog IDs:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/library/books \
+  -H "Content-Type: application/json" \
+  -d '{"catalog_ids":["B081","B064"]}'
+```
+
+The response contains `created` and `already_saved` arrays. Each item includes the saved item ID,
+catalog ID, title, author, edition, and `saved_at` timestamp. Unknown catalog IDs return HTTP 404
+with the structured `catalog_books_not_found` error. Missing or malformed `catalog_ids` returns
+HTTP 400 with the structured `invalid_request` error.
+
+List saved books, newest first:
+
+```bash
+curl http://localhost:8000/api/v1/library/books
+```
+
+Delete one saved book by its catalog ID:
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/library/books/B081
+```
+
+Deletion returns HTTP 204. An item that is not saved returns HTTP 404 with the
+`saved_book_not_found` error. This phase has no user authentication yet; it provides the single
+local saved library required before the Expo client integration.
+
 ### Detect book spines locally
 
 `POST /api/v1/analyze` accepts a multipart shelf image and runs OWLv2 entirely on the Django

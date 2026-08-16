@@ -22,6 +22,7 @@ from config.views import health
 urlpatterns = [
     path('api/v1/health', health, name='health'),
     path('api/v1/', include("catalog_matching.urls")),
+    path('api/v1/', include("library.urls")),
     path('api/v1/', include("spine_detection.urls")),
     path('admin/', admin.site.urls),
 ]
