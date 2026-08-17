@@ -159,7 +159,7 @@ instead of producing partial or misordered matches.
 
 ## Matching against the messy catalog
 
-`catalog.csv` contains 116 canonical rows. Fifty-two entries were curated from ten committed test
+`catalog.csv` contains 116 canonical rows. Fifty-six entries were curated from ten committed test
 shelf photos, with five or six identifiable books selected from every image rather than copying
 every visible spine. The catalog keeps each filename in `source_images` so the test coverage is
 auditable. When an exact edition cannot be identified from a spine, the catalog says so instead of
@@ -231,17 +231,18 @@ Catalog matching classified one as `not_sure` and eleven as `not_found`, so ever
 human review path rather than being silently accepted or dropped. The zero-book path intentionally
 skips OpenRouter.
 
-Cost estimate for the worst-case 12-crop request:
+Cost estimate for the committed sample's 12-crop request:
 
 - Gemini image inputs up to 384 x 384 count as 258 tokens; larger inputs are tiled in 768 x 768
-  units at 258 tokens. The narrow spine crops are estimated at 258-516 tokens each, or
-  3,096-6,192 image-input tokens total.
+  units at 258 tokens. Applying that planning rule to the 12 actual detector crop dimensions gives
+  34 tile units, or an estimated **8,772 image-input tokens** for this sample.
 - OpenRouter currently lists `google/gemini-2.5-flash` at $0.30 per million input tokens and $2.50
   per million output tokens.
-- Estimated image-input cost: **$0.00093-$0.00186 per shelf image**.
+- Estimated image-input cost for this sample: **$0.00263 per shelf image**.
 - Allowing up to 1,000 output tokens for compact structured JSON adds at most **$0.00250**.
-- Estimated worst-case model total: **$0.00343-$0.00436 per shelf image** (roughly 0.34-0.44 cents),
-  before any credit-purchase fee.
+- Estimated sample model total with the configured output cap: **up to $0.00513 per shelf image**
+  (roughly 0.51 cents), before any credit-purchase fee. This is a crop-dimension estimate, not
+  provider billing data; provider-returned usage should supersede it when available.
 
 Pricing and token rules change; verify the
 [OpenRouter model page](https://openrouter.ai/google/gemini-2.5-flash) and

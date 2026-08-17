@@ -1,15 +1,13 @@
-import { usePathname } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
 
 import { ShelfieTabBar, ShelfieTabButton } from '@/components/shelfie';
 
 export default function AppTabs() {
-  const pathname = usePathname();
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
-        <ShelfieTabBar routeHidden={pathname.startsWith('/book/')}>
+        <ShelfieTabBar>
           <TabTrigger name="index" href="/" asChild>
             <ShelfieTabButton
               icon={{ ios: 'camera', android: 'photo_camera', web: 'camera' }}>
