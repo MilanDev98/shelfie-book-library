@@ -10,9 +10,9 @@ import {
 import { ShelfieText } from './text';
 
 const statusStyles = {
-  matched: { backgroundColor: ShelfieColors.matchedTint, color: ShelfieColors.matched, label: 'Matched' },
+  matched: { backgroundColor: ShelfieColors.reviewTint, color: ShelfieColors.review, label: 'Save Pending' },
   saved: { backgroundColor: ShelfieColors.matchedTint, color: ShelfieColors.matched, label: 'Added' },
-  review: { backgroundColor: ShelfieColors.reviewTint, color: ShelfieColors.review, label: 'Needs Review' },
+  pending: { backgroundColor: ShelfieColors.reviewTint, color: ShelfieColors.review, label: 'Pending Review' },
   unreadable: { backgroundColor: ShelfieColors.surfaceTint, color: ShelfieColors.muted, label: 'Unreadable' },
   'no-match': { backgroundColor: ShelfieColors.noMatchTint, color: ShelfieColors.noMatch, label: 'No Match' },
 } as const;

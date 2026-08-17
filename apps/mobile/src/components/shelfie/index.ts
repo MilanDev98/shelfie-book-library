@@ -4,7 +4,6 @@ export * from './button';
 export * from './card';
 export * from './feedback';
 export * from './image-upload-preview';
-export * from './mock-shelf-photo';
 export * from './outcome-state';
 export * from './processing-state';
 export * from './review';

@@ -1,6 +1,5 @@
 import { usePathname } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
-import { View } from 'react-native';
 
 import { ShelfieTabBar, ShelfieTabButton } from '@/components/shelfie';
 
@@ -22,9 +21,6 @@ export default function AppTabs() {
               icon={{ ios: 'books.vertical', android: 'menu_book', web: 'menu_book' }}>
               Library
             </ShelfieTabButton>
-          </TabTrigger>
-          <TabTrigger name="book" href="/book/1984" asChild>
-            <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ display: 'none' }} />
           </TabTrigger>
         </ShelfieTabBar>
       </TabList>
