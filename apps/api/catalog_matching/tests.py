@@ -1,4 +1,6 @@
+import csv
 from io import StringIO
+from pathlib import Path
 from typing import ClassVar
 
 from django.core.management import call_command
@@ -27,7 +29,55 @@ class CatalogImportTests(TestCase):
         call_command("import_catalog", stdout=output, verbosity=0)
 
         self.assertEqual(CatalogBook.objects.count(), initial_count)
-        self.assertIn(f"created=0 updated=0 unchanged={initial_count}", output.getvalue())
+        self.assertIn(
+            f"created=0 updated=0 unchanged={initial_count} deleted=0",
+            output.getvalue(),
+        )
+
+    def test_prune_removes_books_missing_from_the_import_file(self) -> None:
+        call_command("import_catalog", verbosity=0)
+        CatalogBook.objects.create(
+            catalog_id="STALE999",
+            title="Stale Catalog Book",
+            author="Old Fixture",
+        )
+
+        call_command("import_catalog", prune=True, verbosity=0)
+
+        self.assertFalse(CatalogBook.objects.filter(catalog_id="STALE999").exists())
+
+    def test_each_test_photo_has_a_curated_subset_in_the_catalog(self) -> None:
+        repository_root = Path(__file__).resolve().parents[3]
+        catalog_path = repository_root / "catalog.csv"
+        with catalog_path.open(encoding="utf-8", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+
+        expected_images = {
+            "word-order-bookshelf.webp",
+            "business-bookshelf.webp",
+            "literary-bookshelf.jpeg",
+            "fiction-bookshelf.jpeg",
+            "mixed-bookshelf.jpg",
+            "design-bookshelf.jpg",
+            "graphic-bookshelf.jpeg",
+            "romance-bookshelf.jpg",
+            "classics-bookshelf.jpg",
+            "writing-bookshelf.webp",
+        }
+        counts = {image_name: 0 for image_name in expected_images}
+        for row in rows:
+            for image_name in row["source_images"].split("|"):
+                if image_name in counts:
+                    counts[image_name] += 1
+
+        self.assertEqual(set(counts), expected_images)
+        self.assertTrue(all(5 <= count <= 6 for count in counts.values()), counts)
+        self.assertTrue(
+            all(
+                (repository_root / "test_photos" / image_name).is_file()
+                for image_name in expected_images
+            )
+        )
 
 
 class CatalogMatcherTests(TestCase):

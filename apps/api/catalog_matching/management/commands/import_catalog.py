@@ -17,6 +17,14 @@ class Command(BaseCommand):
             default=None,
             help="Optional catalog CSV path; defaults to the repository-root catalog.csv.",
         )
+        parser.add_argument(
+            "--prune",
+            action="store_true",
+            help=(
+                "Delete database books that are not present in the imported CSV. "
+                "This also deletes their saved-library entries through the database cascade."
+            ),
+        )
 
     def handle(self, *args: object, **options: object) -> None:
         path_option = options.get("path")
@@ -31,6 +39,7 @@ class Command(BaseCommand):
         created = 0
         updated = 0
         unchanged = 0
+        deleted = 0
 
         with transaction.atomic():
             for record in records:
@@ -41,6 +50,7 @@ class Command(BaseCommand):
                     "author_aliases": list(record.author_aliases),
                     "edition": record.edition,
                     "contained_titles": list(record.contained_titles),
+                    "source_images": list(record.source_images),
                 }
                 book, was_created = CatalogBook.objects.get_or_create(
                     catalog_id=record.catalog_id,
@@ -64,9 +74,16 @@ class Command(BaseCommand):
                 book.save(update_fields=changed_fields)
                 updated += 1
 
+            if options.get("prune"):
+                imported_ids = {record.catalog_id for record in records}
+                _, deleted_by_model = CatalogBook.objects.exclude(
+                    catalog_id__in=imported_ids
+                ).delete()
+                deleted = deleted_by_model.get("catalog_matching.CatalogBook", 0)
+
         self.stdout.write(
             self.style.SUCCESS(
                 "Catalog import complete: "
-                f"created={created} updated={updated} unchanged={unchanged}"
+                f"created={created} updated={updated} unchanged={unchanged} deleted={deleted}"
             )
         )

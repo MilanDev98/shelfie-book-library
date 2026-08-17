@@ -8,9 +8,10 @@ reviewable, persistent personal library. The complete path is:
 3. Detect book-spine regions locally with CPU-only OWLv2.
 4. Send only the detected spine crops to a hosted vision-language model through
    OpenRouter to read title and author text.
-5. Match each read against a deliberately messy 170-book catalog.
+5. Match each read against a deliberately messy 116-book catalog.
 6. Add confident matches directly; confirm, correct, or discard uncertain reads.
-7. Persist confirmed catalog books to SQLite and show them in the mobile library.
+7. Persist automatically accepted and user-confirmed catalog books to SQLite and show them in the
+   mobile library.
 
 The project is intentionally single-user and local-development focused. Authentication and
 deployment were outside the assignment scope.
@@ -48,8 +49,8 @@ Django POST /api/v1/analyze/read
 - `test_photos`: the real shelf sample and zero-book control used during development.
 
 The original image stays between the phone and Django. The hosted provider receives only the
-numbered spine crops. Images, detections, and provider output are not persisted; only catalog IDs
-explicitly confirmed by the user are saved.
+numbered spine crops. Images, detections, and provider output are not persisted. High-confidence
+catalog matches are saved automatically; uncertain matches are saved only after user confirmation.
 
 ## Clean-clone setup
 
@@ -140,8 +141,9 @@ changing any root `.env` provider setting.
 
 ## User flow and human review
 
-High-confidence matches are shown as ready to add, but are not persisted until the user taps the
-library action. `not_sure` results enter a first-class review screen. The user can:
+High-confidence matches are persisted automatically and shown as added. If that save request fails,
+the results remain in an explicit `Save Pending` state with a retry action. `not_sure` results enter
+a first-class `Pending Review` screen. The user can:
 
 - confirm the suggested catalog entry and save it immediately;
 - search the supplied catalog and replace the suggestion; or
@@ -157,8 +159,23 @@ instead of producing partial or misordered matches.
 
 ## Matching against the messy catalog
 
-`catalog.csv` contains 170 canonical rows. `import_catalog` validates required fields and unique
-IDs, then idempotently imports the data into `CatalogBook`.
+`catalog.csv` contains 116 canonical rows. Fifty-two entries were curated from ten committed test
+shelf photos, with five or six identifiable books selected from every image rather than copying
+every visible spine. The catalog keeps each filename in `source_images` so the test coverage is
+auditable. When an exact edition cannot be identified from a spine, the catalog says so instead of
+inventing an ISBN or edition.
+
+`import_catalog` validates required fields and unique IDs, then idempotently imports the data into
+`CatalogBook`. To make an existing database exactly match the CSV and remove stale catalog rows,
+run:
+
+```bash
+uv --project apps/api run python apps/api/manage.py import_catalog --prune
+```
+
+`--prune` is intentionally destructive: removing a catalog row also removes its saved-library
+entry through the database relationship. It is not part of clean-clone setup and should be used
+only when replacing an existing development catalog.
 
 The matcher normalizes case, punctuation, accents, initials, and `Lastname, Firstname` ordering.
 It scores every row using the best canonical, alternate, or contained-title similarity plus author
@@ -251,9 +268,15 @@ image content must agree. Temporary images and crops are removed after each requ
 
 - `test_photos/bookshelf-sample.webp`: positive local-detector and truncation test.
 - `test_photos/no-books-control.jpg`: generated blank control for the zero-detection path.
+- `test_photos/*-bookshelf.*`: ten varied shelf photos used to build the photo-backed catalog
+  subset and exercise local upload/image validation.
 
-The assignment's live presentation photos are intentionally not included because they will be
-provided by the reviewers at demo time.
+All ten curated shelf photos passed the real upload validator and local OWLv2 detector. Each
+reached the 12-detection safety cap and reported `truncated=true`, which is expected for these
+dense shelves and reinforces the one-shelf-at-a-time guidance in the app.
+
+The reviewers' live presentation photos are not included because they will be provided at demo
+time.
 
 ## Quality checks
 

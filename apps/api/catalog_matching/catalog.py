@@ -10,6 +10,7 @@ REQUIRED_COLUMNS = (
     "author_aliases",
     "edition",
     "contained_titles",
+    "source_images",
 )
 
 
@@ -26,6 +27,7 @@ class CatalogRecord:
     author_aliases: tuple[str, ...]
     edition: str
     contained_titles: tuple[str, ...]
+    source_images: tuple[str, ...]
 
 
 def default_catalog_path() -> Path:
@@ -78,6 +80,7 @@ def read_catalog_csv(path: Path | None = None) -> tuple[CatalogRecord, ...]:
                     author_aliases=_split_values(row["author_aliases"]),
                     edition=row["edition"].strip(),
                     contained_titles=_split_values(row["contained_titles"]),
+                    source_images=_split_values(row["source_images"]),
                 )
             )
 

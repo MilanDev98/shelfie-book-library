@@ -11,6 +11,7 @@ class CatalogBook(models.Model):
     author_aliases = models.JSONField(default=list, blank=True)
     edition = models.CharField(max_length=255, blank=True)
     contained_titles = models.JSONField(default=list, blank=True)
+    source_images = models.JSONField(default=list, blank=True)
 
     class Meta:
         ordering = ("catalog_id",)

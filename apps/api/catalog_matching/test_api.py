@@ -123,7 +123,7 @@ class CatalogLookupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["count"], 170)
+        self.assertEqual(payload["count"], 116)
         self.assertEqual(len(payload["results"]), 10)
         self.assertEqual(
             set(payload["results"][0]),
