@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,8 +39,8 @@ export default function LibraryScreen() {
   }, []);
   const visibleBooks = books.filter((book) => `${book.title} ${book.author}`.toLowerCase().includes(query.toLowerCase()));
 
-  useEffect(() => { setShelfieTabBarVisible(true); }, []);
   useFocusEffect(useCallback(() => {
+    setShelfieTabBarVisible(true);
     void loadLibrary();
   }, [loadLibrary]));
 

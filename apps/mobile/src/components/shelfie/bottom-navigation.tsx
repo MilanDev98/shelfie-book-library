@@ -12,7 +12,7 @@ import {
 } from '@/constants/theme';
 
 import { ShelfieText } from './text';
-import { subscribeToShelfieTabBar } from './tab-bar-visibility';
+import { getShelfieTabBarVisible, subscribeToShelfieTabBar } from './tab-bar-visibility';
 
 type ShelfieSymbolName = ComponentProps<typeof SymbolView>['name'];
 
@@ -38,7 +38,7 @@ export function ShelfieTabButton({ children, icon, isFocused, ...props }: Shelfi
 }
 
 export function ShelfieTabBar({ routeHidden = false, style, ...props }: TabListProps & { routeHidden?: boolean }) {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(getShelfieTabBarVisible);
 
   useEffect(() => subscribeToShelfieTabBar(setVisible), []);
 

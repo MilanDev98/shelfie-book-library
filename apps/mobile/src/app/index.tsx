@@ -128,15 +128,17 @@ export default function ScanHomeScreen() {
     }
   }, []);
   useFocusEffect(useCallback(() => {
+    setShelfieTabBarVisible(screen === 'home');
     if (screen !== 'home') return;
     const controller = new AbortController();
     void loadHomeLibrary(controller.signal);
     return () => controller.abort();
   }, [loadHomeLibrary, screen]));
-  useEffect(() => {
-    setShelfieTabBarVisible(screen === 'home');
-    return () => setShelfieTabBarVisible(true);
-  }, [screen]);
+
+  const openLibrary = useCallback(() => {
+    setShelfieTabBarVisible(true);
+    router.push('/explore');
+  }, [router]);
   useEffect(() => {
     if (screen !== 'processing') return;
     const startedAt = Date.now();
@@ -339,7 +341,7 @@ export default function ScanHomeScreen() {
     <View style={styles.actions}><ShelfieButton size="lg" accessibilityLabel="Scan your bookshelf" onPress={openCapture}><View style={styles.buttonContent}><SymbolView name={{ ios: 'camera', android: 'photo_camera', web: 'camera' }} size={20} tintColor={ShelfieColors.onPrimary} weight="regular" /><ShelfieText variant="button" style={styles.primaryButtonText}>Scan Bookshelf</ShelfieText></View></ShelfieButton><ShelfieButton size="lg" variant="secondary" accessibilityLabel="Choose a bookshelf photo" onPress={openPhoto}><View style={styles.buttonContent}><SymbolView name={{ ios: 'photo', android: 'image', web: 'image' }} size={20} tintColor={ShelfieColors.primary} weight="regular" /><ShelfieText variant="button" style={styles.secondaryButtonText}>Choose Photo</ShelfieText></View></ShelfieButton></View>
     <View style={styles.tips}><ShelfieText variant="badge" color="quiet" style={styles.tipsHeading}>For better results</ShelfieText><View style={styles.tipList}>{tips.map((tip) => <View key={tip} style={styles.tipRow}><View style={styles.tipDot} /><ShelfieText variant="label">{tip}</ShelfieText></View>)}</View></View>
     <View style={styles.homeLibrary}>
-      <View style={styles.homeLibraryHeading}><View style={styles.homeLibraryTitle}><ShelfieText variant="title">Your Library</ShelfieText>{!homeLibraryLoading && !homeLibraryError ? <ShelfieText variant="caption" color="quiet">{homeLibraryBooks.length} {homeLibraryBooks.length === 1 ? 'book' : 'books'}</ShelfieText> : null}</View>{homeLibraryBooks.length > 0 ? <Pressable accessibilityRole="button" onPress={() => router.push('/explore')}><ShelfieText variant="label" color="primary">View all</ShelfieText></Pressable> : null}</View>
+      <View style={styles.homeLibraryHeading}><View style={styles.homeLibraryTitle}><ShelfieText variant="title">Your Library</ShelfieText>{!homeLibraryLoading && !homeLibraryError ? <ShelfieText variant="caption" color="quiet">{homeLibraryBooks.length} {homeLibraryBooks.length === 1 ? 'book' : 'books'}</ShelfieText> : null}</View>{homeLibraryBooks.length > 0 ? <Pressable accessibilityRole="button" onPress={openLibrary}><ShelfieText variant="label" color="primary">View all</ShelfieText></Pressable> : null}</View>
       {homeLibraryLoading
         ? <ShelfieCard style={styles.homeLibraryState}><ActivityIndicator color={ShelfieColors.primary} /><ShelfieText accessibilityLiveRegion="polite" variant="caption" color="muted">Loading your books…</ShelfieText></ShelfieCard>
         : homeLibraryError
@@ -398,7 +400,7 @@ export default function ScanHomeScreen() {
         {matchedBooks.length > 0
           ? <ShelfieButton disabled={isRetryingAutomaticSave} loading={isRetryingAutomaticSave} size="md" variant="secondary" onPress={() => void retryAutomaticSave()}>{`Retry Saving ${matchedBooks.length} ${matchedBooks.length === 1 ? 'Book' : 'Books'}`}</ShelfieButton>
           : savedBooks.length > 0
-            ? <ShelfieButton size="md" variant="secondary" onPress={() => router.push('/explore')}>View Library</ShelfieButton>
+            ? <ShelfieButton size="md" variant="secondary" onPress={openLibrary}>View Library</ShelfieButton>
             : null}
       </Footer>
     </View>;
